@@ -1,0 +1,152 @@
+x-host: &host localhost
+x-url-portal: &url_portal localhost
+x-url-backend: &url_backend localhost
+x-admin-user: &admin_user admin
+x-admin-password: &admin_password admin123
+x-admin-email: &admin_email admin@example.com
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: openroutex-postgres
+    dns:
+      - 127.0.0.11
+      - 8.8.8.8
+      - 1.1.1.1
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: openroutex
+      POSTGRES_PASSWORD: openroutex
+      POSTGRES_DB: openroutex
+    volumes:
+      - openroutex_postgres:/var/lib/postgresql/data
+    ports:
+      - "15432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U openroutex -d openroutex"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    container_name: openroutex-redis
+    dns:
+      - 127.0.0.11
+      - 8.8.8.8
+      - 1.1.1.1
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - openroutex_redis:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  app:
+    container_name: openroutex
+    build:
+      context: ./app
+    dns:
+      - 127.0.0.11
+      - 8.8.8.8
+      - 1.1.1.1
+    restart: unless-stopped
+    environment:
+      PORT: "3994"
+      HOST: *host
+      URL_PORTAL: *url_portal
+      URL_BACKEND: *url_backend
+      ADMIN_USER: *admin_user
+      ADMIN_PASSWORD: *admin_password
+      ADMIN_EMAIL: *admin_email
+      PGHOST: postgres
+      PGPORT: "5432"
+      PGUSER: openroutex
+      PGPASSWORD: openroutex
+      PGDATABASE: openroutex
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      TYPEORM_SYNC: "true"
+      PROXY_TIMEOUT_MS: "30000"
+      PROXY_BODY_LIMIT: "25mb"
+      ADMIN_BODY_LIMIT: "2mb"
+      OAUTH2_TIMEOUT_MS: "10000"
+      SSL_KEY_PATH: ""
+      SSL_CERT_PATH: ""
+      SSL_PASSPHRASE: ""
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "node -e \"require('http').get('http://127.0.0.1:3994/health',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))\""
+        ]
+      interval: 10s
+      timeout: 3s
+      retries: 20
+    ports:
+      - "3994:3994"
+
+  web:
+    build:
+      context: ./web
+      args:
+        HOST: *host
+        URL_BACKEND: *url_backend
+    container_name: openroutex-web
+    dns:
+      - 127.0.0.11
+      - 8.8.8.8
+      - 1.1.1.1
+    restart: unless-stopped
+    environment:
+      ORX_I18N_DIR: /data/i18n
+    depends_on:
+      app:
+        condition: service_healthy
+    volumes:
+      - ./web/public/i18n:/data/i18n:ro
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "node -e \"require('http').get('http://127.0.0.1:3000/',r=>process.exit(r.statusCode>=200&&r.statusCode<500?0:1)).on('error',()=>process.exit(1))\""
+        ]
+      interval: 10s
+      timeout: 3s
+      retries: 20
+    ports:
+      - "3100:3000"
+
+  edge:
+    image: nginx:1.27-alpine
+    container_name: openroutex-edge
+    profiles: ["edge"]
+    dns:
+      - 127.0.0.11
+      - 8.8.8.8
+      - 1.1.1.1
+    restart: unless-stopped
+    depends_on:
+      web:
+        condition: service_healthy
+    environment:
+      EDGE_SSL_CERT: /etc/nginx/certs/fullchain.pem
+      EDGE_SSL_KEY: /etc/nginx/certs/privkey.pem
+    volumes:
+      - ./docker/nginx/portal.conf.template:/etc/nginx/templates/default.conf.template:ro
+      - ./certs:/etc/nginx/certs:ro
+    ports:
+      - "80:80"
+      - "443:443"
+
+volumes:
+  openroutex_postgres:
+  openroutex_redis:

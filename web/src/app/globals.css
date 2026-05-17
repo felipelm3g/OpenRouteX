@@ -1,0 +1,45 @@
+@import "tailwindcss";
+
+:root {
+  --background: #0b1020;
+  --foreground: #e5e7eb;
+  --card: rgba(255, 255, 255, 0.06);
+  --card-border: rgba(255, 255, 255, 0.12);
+  --muted: rgba(255, 255, 255, 0.72);
+  --muted-2: rgba(255, 255, 255, 0.55);
+  --accent: #7c3aed;
+  --accent-2: #3b82f6;
+}
+
+html[data-theme='light'] {
+  --background: #f7f7fb;
+  --foreground: #0b1020;
+  --card: rgba(255, 255, 255, 0.85);
+  --card-border: rgba(2, 6, 23, 0.08);
+  --muted: rgba(2, 6, 23, 0.74);
+  --muted-2: rgba(2, 6, 23, 0.56);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system,
+    Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+}
+
+select option,
+select optgroup {
+  background: var(--background);
+  color: var(--foreground);
+}
+
+* {
+  outline-color: rgba(124, 58, 237, 0.55);
+}
