@@ -74,15 +74,21 @@ export class RequestEngineService {
     }
     const finalUrl = urlObj.toString();
 
-    const externalAuthHeaders = await this.authEngine.buildExternalAuthHeaders(
-      params.auth,
-    );
-
-    const outgoingHeaders = {
+    const baseHeaders = {
       ...params.clientHeaders,
       ...addHeadersResolved.value,
-      ...externalAuthHeaders.headers,
     };
+    const externalAuthHeaders = await this.authEngine.buildExternalAuthHeaders(
+      params.auth,
+      {
+        method: params.method,
+        url: finalUrl,
+        headers: baseHeaders,
+        body: params.body,
+      },
+    );
+
+    const outgoingHeaders = { ...baseHeaders, ...externalAuthHeaders.headers };
 
     const timeoutMs = Number(
       params.timeoutMs ?? this.config.get<string>('PROXY_TIMEOUT_MS', '30000'),

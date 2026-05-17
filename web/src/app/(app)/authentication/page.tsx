@@ -11,9 +11,12 @@ import { apiFetch } from '@/lib/api';
 type AuthType =
   | 'api_key'
   | 'oauth2_client_credentials'
+  | 'oidc_client_credentials'
   | 'bearer'
   | 'basic'
-  | 'custom_header';
+  | 'custom_header'
+  | 'hmac'
+  | 'oauth1';
 
 type Auth = {
   id: string;
@@ -25,6 +28,9 @@ type Auth = {
 
 function typeLabel(t: AuthType) {
   if (t === 'oauth2_client_credentials') return 'OAuth2 Client Credentials';
+  if (t === 'oidc_client_credentials') return 'OIDC Client Credentials';
+  if (t === 'oauth1') return 'OAuth 1.0a';
+  if (t === 'hmac') return 'HMAC Signature';
   if (t === 'custom_header') return 'Custom Header';
   if (t === 'api_key') return 'API Key';
   if (t === 'bearer') return 'Bearer';
@@ -36,6 +42,39 @@ function defaultConfig(t: AuthType): Record<string, unknown> {
   if (t === 'bearer') return { token: '' };
   if (t === 'basic') return { username: '', password: '' };
   if (t === 'custom_header') return { headerName: 'X-CUSTOM', value: '' };
+  if (t === 'oidc_client_credentials') {
+    return {
+      issuerUrl: '',
+      tokenUrl: '',
+      clientId: '',
+      clientSecret: '',
+      scope: '',
+      audience: '',
+      authStyle: 'basic',
+    };
+  }
+  if (t === 'hmac') {
+    return {
+      headerName: 'Authorization',
+      keyId: '',
+      secret: '',
+      algorithm: 'sha256',
+      signatureEncoding: 'hex',
+      timestampHeaderName: '',
+      nonceHeaderName: '',
+      stringToSignTemplate: '{method}\n{path}\n{query}\n{body_sha256}\n{timestamp}',
+      headerValueTemplate: 'HMAC {keyId}:{signature}',
+    };
+  }
+  if (t === 'oauth1') {
+    return {
+      consumerKey: '',
+      consumerSecret: '',
+      token: '',
+      tokenSecret: '',
+      realm: '',
+    };
+  }
   return {
     tokenUrl: '',
     clientId: '',
@@ -172,7 +211,7 @@ export default function AuthenticationPage() {
   return (
     <PageShell
       title="Credenciais Upstream"
-      subtitle="Crie autenticações reutilizáveis para aplicar nos Paths (OAuth2, Bearer, Basic, API Key e Custom Header)."
+      subtitle="Crie autenticações reutilizáveis para aplicar nos Paths (OAuth2/OIDC, Bearer, Basic, API Key, Custom Header, HMAC e OAuth1)."
       right={<Button onClick={beginCreate}>Criar Credencial</Button>}
     >
       <Card>
@@ -263,6 +302,9 @@ export default function AuthenticationPage() {
                   { value: 'api_key', label: 'API Key (header)' },
                   { value: 'custom_header', label: 'Custom Header' },
                   { value: 'oauth2_client_credentials', label: 'OAuth2 Client Credentials' },
+                  { value: 'oidc_client_credentials', label: 'OIDC Client Credentials' },
+                  { value: 'hmac', label: 'HMAC Signature' },
+                  { value: 'oauth1', label: 'OAuth 1.0a' },
                 ]}
               />
             </div>
@@ -356,6 +398,160 @@ export default function AuthenticationPage() {
                     />
                   </div>
                 </div>
+              </>
+            ) : null}
+
+            {type === 'oidc_client_credentials' ? (
+              <>
+                <Field
+                  label="issuerUrl"
+                  value={String(config.issuerUrl ?? '')}
+                  onChange={(v) => setConfig((p) => ({ ...p, issuerUrl: v }))}
+                />
+                <Field
+                  label="tokenUrl (opcional)"
+                  value={String(config.tokenUrl ?? '')}
+                  onChange={(v) => setConfig((p) => ({ ...p, tokenUrl: v }))}
+                />
+                <Field
+                  label="clientId"
+                  value={String(config.clientId ?? '')}
+                  onChange={(v) => setConfig((p) => ({ ...p, clientId: v }))}
+                />
+                <Field
+                  label="clientSecret"
+                  value={String(config.clientSecret ?? '')}
+                  onChange={(v) => setConfig((p) => ({ ...p, clientSecret: v }))}
+                  type="password"
+                />
+                <Field
+                  label="scope"
+                  value={String(config.scope ?? '')}
+                  onChange={(v) => setConfig((p) => ({ ...p, scope: v }))}
+                />
+                <Field
+                  label="audience"
+                  value={String(config.audience ?? '')}
+                  onChange={(v) => setConfig((p) => ({ ...p, audience: v }))}
+                />
+                <div className="sm:col-span-2">
+                  <div className="text-xs text-white/55">
+                    authStyle: basic (Authorization header) ou body (client_id/client_secret no body).
+                  </div>
+                  <div className="mt-2">
+                    <Select
+                      value={String(config.authStyle ?? 'basic')}
+                      onChange={(v) => setConfig((p) => ({ ...p, authStyle: v }))}
+                      options={[
+                        { value: 'basic', label: 'basic' },
+                        { value: 'body', label: 'body' },
+                      ]}
+                    />
+                  </div>
+                </div>
+              </>
+            ) : null}
+
+            {type === 'hmac' ? (
+              <>
+                <Field
+                  label="headerName"
+                  value={String(config.headerName ?? '')}
+                  onChange={(v) => setConfig((p) => ({ ...p, headerName: v }))}
+                />
+                <Field
+                  label="keyId"
+                  value={String(config.keyId ?? '')}
+                  onChange={(v) => setConfig((p) => ({ ...p, keyId: v }))}
+                />
+                <Field
+                  label="secret"
+                  value={String(config.secret ?? '')}
+                  onChange={(v) => setConfig((p) => ({ ...p, secret: v }))}
+                  type="password"
+                />
+                <div>
+                  <div className="text-xs font-medium text-white/70">algorithm</div>
+                  <div className="mt-2">
+                    <Select
+                      value={String(config.algorithm ?? 'sha256')}
+                      onChange={(v) => setConfig((p) => ({ ...p, algorithm: v }))}
+                      options={[
+                        { value: 'sha256', label: 'sha256' },
+                        { value: 'sha1', label: 'sha1' },
+                        { value: 'sha512', label: 'sha512' },
+                      ]}
+                    />
+                  </div>
+                </div>
+                <div>
+                  <div className="text-xs font-medium text-white/70">signatureEncoding</div>
+                  <div className="mt-2">
+                    <Select
+                      value={String(config.signatureEncoding ?? 'hex')}
+                      onChange={(v) => setConfig((p) => ({ ...p, signatureEncoding: v }))}
+                      options={[
+                        { value: 'hex', label: 'hex' },
+                        { value: 'base64', label: 'base64' },
+                      ]}
+                    />
+                  </div>
+                </div>
+                <Field
+                  label="timestampHeaderName (opcional)"
+                  value={String(config.timestampHeaderName ?? '')}
+                  onChange={(v) => setConfig((p) => ({ ...p, timestampHeaderName: v }))}
+                />
+                <Field
+                  label="nonceHeaderName (opcional)"
+                  value={String(config.nonceHeaderName ?? '')}
+                  onChange={(v) => setConfig((p) => ({ ...p, nonceHeaderName: v }))}
+                />
+                <Field
+                  label="stringToSignTemplate"
+                  value={String(config.stringToSignTemplate ?? '')}
+                  onChange={(v) => setConfig((p) => ({ ...p, stringToSignTemplate: v }))}
+                />
+                <Field
+                  label="headerValueTemplate"
+                  value={String(config.headerValueTemplate ?? '')}
+                  onChange={(v) => setConfig((p) => ({ ...p, headerValueTemplate: v }))}
+                />
+                <div className="sm:col-span-2 text-xs text-white/55">
+                  Variáveis: {'{method} {url} {path} {query} {timestamp} {nonce} {body_sha256} {body_base64} {signature} {keyId}'}
+                </div>
+              </>
+            ) : null}
+
+            {type === 'oauth1' ? (
+              <>
+                <Field
+                  label="consumerKey"
+                  value={String(config.consumerKey ?? '')}
+                  onChange={(v) => setConfig((p) => ({ ...p, consumerKey: v }))}
+                />
+                <Field
+                  label="consumerSecret"
+                  value={String(config.consumerSecret ?? '')}
+                  onChange={(v) => setConfig((p) => ({ ...p, consumerSecret: v }))}
+                  type="password"
+                />
+                <Field
+                  label="token (opcional)"
+                  value={String(config.token ?? '')}
+                  onChange={(v) => setConfig((p) => ({ ...p, token: v }))}
+                />
+                <Field
+                  label="tokenSecret (opcional)"
+                  value={String(config.tokenSecret ?? '')}
+                  onChange={(v) => setConfig((p) => ({ ...p, tokenSecret: v }))}
+                  type="password"
+                />
+                <Field
+                  label="realm (opcional)"
+                  value={String(config.realm ?? '')}
+                  onChange={(v) => setConfig((p) => ({ ...p, realm: v }))}
+                />
               </>
             ) : null}
           </div>

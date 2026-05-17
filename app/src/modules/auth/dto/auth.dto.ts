@@ -11,9 +11,12 @@ export class CreateAuthDto {
   @IsIn([
     'api_key',
     'oauth2_client_credentials',
+    'oidc_client_credentials',
     'bearer',
     'basic',
     'custom_header',
+    'hmac',
+    'oauth1',
   ] satisfies AuthType[])
   type!: AuthType;
 
@@ -32,9 +35,12 @@ export class UpdateAuthDto {
   @IsIn([
     'api_key',
     'oauth2_client_credentials',
+    'oidc_client_credentials',
     'bearer',
     'basic',
     'custom_header',
+    'hmac',
+    'oauth1',
   ] satisfies AuthType[])
   type?: AuthType;
 
@@ -42,4 +48,3 @@ export class UpdateAuthDto {
   @IsObject()
   config?: Record<string, unknown>;
 }
-

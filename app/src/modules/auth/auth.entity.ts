@@ -9,9 +9,12 @@ import {
 export type AuthType =
   | 'api_key'
   | 'oauth2_client_credentials'
+  | 'oidc_client_credentials'
   | 'bearer'
   | 'basic'
-  | 'custom_header';
+  | 'custom_header'
+  | 'hmac'
+  | 'oauth1';
 
 @Entity({ name: 'auths' })
 export class AuthEntity {
@@ -33,4 +36,3 @@ export class AuthEntity {
   @UpdateDateColumn({ type: 'timestamptz' })
   updatedAt!: Date;
 }
-
