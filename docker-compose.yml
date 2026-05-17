@@ -2,7 +2,7 @@ x-host: &host localhost
 x-url-portal: &url_portal localhost
 x-url-backend: &url_backend localhost
 x-admin-user: &admin_user admin
-x-admin-password: &admin_password admin123
+x-admin-password: &admin_password CHANGE_ME
 x-admin-email: &admin_email admin@example.com
 
 services:

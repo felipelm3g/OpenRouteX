@@ -50,7 +50,7 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
 
   if (!res.ok && res.status === 401 && path !== '/admin/login') {
     if (typeof document !== 'undefined') {
-      document.cookie = 'orx_token=; Path=/; Max-Age=0';
+      document.cookie = 'orx_token=; Path=/; Max-Age=0; SameSite=Lax; Priority=High';
     }
     if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
       const next = `${window.location.pathname}${window.location.search}`;

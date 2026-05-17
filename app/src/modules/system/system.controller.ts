@@ -48,7 +48,7 @@ export class SystemController {
     const token = String(body?.token ?? '').trim();
     const password = String(body?.password ?? '').trim();
     if (!token) throw new BadRequestException('Token obrigatório');
-    if (password.length < 8) throw new BadRequestException('Senha deve ter no mínimo 8 caracteres');
+    if (!password) throw new BadRequestException('Senha obrigatória');
 
     const key = `orx:pwdreset:${token}`;
     const raw = await this.redis.client.get(key);

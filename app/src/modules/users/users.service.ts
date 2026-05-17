@@ -1,6 +1,6 @@
 import { randomBytes, scryptSync, timingSafeEqual } from 'crypto';
 
-import { BadRequestException, ForbiddenException, HttpException, Injectable, NotFoundException, OnModuleInit } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, HttpException, Injectable, NotFoundException, OnModuleInit, ServiceUnavailableException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 
@@ -107,10 +107,19 @@ export class UsersService implements OnModuleInit {
     const total = await this.repo.count();
     if (total > 0) return;
 
+    const allowInsecureDefaults = String(process.env.ORX_ALLOW_INSECURE_DEFAULTS ?? '').trim().toLowerCase() === 'true';
+
     const username = normalizeUsername(process.env.ADMIN_USER ?? 'admin');
     const email = normalizeEmail(process.env.ADMIN_EMAIL ?? 'admin@example.com');
     const password = String(process.env.ADMIN_PASSWORD ?? 'admin123');
     if (!username || !email || !password) return;
+
+    const weakDefaults = new Set(['admin123', 'admin', 'password', 'changeme', 'change_me', '123456', '12345678']);
+    if (!allowInsecureDefaults && weakDefaults.has(password.trim().toLowerCase())) {
+      throw new ServiceUnavailableException(
+        'ADMIN_PASSWORD inseguro. Defina uma senha forte (ex.: via docker-compose.yml) ou defina ORX_ALLOW_INSECURE_DEFAULTS=true para desenvolvimento.',
+      );
+    }
 
     const cfg = await this.settings.getSettings();
     const policy = passwordMeetsPolicy(password, cfg);

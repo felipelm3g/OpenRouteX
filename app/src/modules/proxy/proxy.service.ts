@@ -121,6 +121,7 @@ export class ProxyService {
       originalUrl,
       requestHeaders: toSingleHeaderMap(req.headers),
       requestBody: Buffer.isBuffer(req.body) ? req.body : null,
+      redactHeaders: [apiKeyHeader],
     });
 
     try {
@@ -153,6 +154,7 @@ export class ProxyService {
           responseBody: Buffer.from(JSON.stringify({ error: 'rate_limited' })),
           statusCode: 429,
           durationMs: Date.now() - startedAt,
+          redactHeaders: [apiKeyHeader],
         });
         return;
       }
@@ -212,6 +214,7 @@ export class ProxyService {
         responseBody: upstream.body,
         statusCode: upstream.statusCode,
         durationMs: Date.now() - startedAt,
+        redactHeaders: [apiKeyHeader],
       });
     } catch (err: any) {
       const isTimeout =
@@ -227,6 +230,7 @@ export class ProxyService {
           responseBody: null,
           statusCode: 504,
           durationMs: Date.now() - startedAt,
+          redactHeaders: [apiKeyHeader],
         });
         return;
       }
@@ -241,6 +245,7 @@ export class ProxyService {
         responseBody: body,
         statusCode: status,
         durationMs: Date.now() - startedAt,
+        redactHeaders: [apiKeyHeader],
       });
     }
   }

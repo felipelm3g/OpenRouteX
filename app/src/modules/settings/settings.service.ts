@@ -53,7 +53,7 @@ const DEFAULTS: SettingsDto = {
   proxyTimeoutMs: 30000,
   defaultForwardClientQuery: true,
   apiKeyHeaderName: 'API-KEY',
-  proxyBlockedHeaders: [],
+  proxyBlockedHeaders: ['forwarded', 'x-forwarded-for', 'x-forwarded-host', 'x-forwarded-proto', 'x-real-ip'],
   loginMaxAttempts: 3,
   loginLockMinutes: 180,
   loginLockEmailEnabled: true,

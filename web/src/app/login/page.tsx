@@ -12,11 +12,11 @@ type LoginResponse = { token: string };
 
 function setTokenCookie(token: string) {
   const secure = typeof window !== 'undefined' && window.location.protocol === 'https:' ? '; Secure' : '';
-  document.cookie = `orx_token=${token}; Path=/; SameSite=Lax${secure}`;
+  document.cookie = `orx_token=${token}; Path=/; Max-Age=604800; SameSite=Lax; Priority=High${secure}`;
 }
 
 function clearTokenCookie() {
-  document.cookie = 'orx_token=; Path=/; Max-Age=0; SameSite=Lax';
+  document.cookie = 'orx_token=; Path=/; Max-Age=0; SameSite=Lax; Priority=High';
 }
 
 export default function LoginPage() {
@@ -28,7 +28,10 @@ export default function LoginPage() {
   const nextUrl = useMemo(() => {
     if (typeof window === 'undefined') return '/dashboard';
     const next = new URLSearchParams(window.location.search).get('next') ?? '';
-    return next.trim() ? next : '/dashboard';
+    const value = next.trim();
+    if (!value) return '/dashboard';
+    if (value.startsWith('/') && !value.startsWith('//')) return value;
+    return '/dashboard';
   }, []);
 
   useEffect(() => {

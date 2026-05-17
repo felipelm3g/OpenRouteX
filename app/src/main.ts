@@ -57,7 +57,16 @@ async function bootstrap() {
     },
   });
 
-  (app.getHttpAdapter().getInstance() as any).set('trust proxy', true);
+  const express = app.getHttpAdapter().getInstance() as any;
+  express.disable('x-powered-by');
+  express.set('trust proxy', true);
+  express.use((_: any, res: any, next: any) => {
+    res.setHeader('x-content-type-options', 'nosniff');
+    res.setHeader('referrer-policy', 'no-referrer');
+    res.setHeader('x-frame-options', 'DENY');
+    res.setHeader('permissions-policy', 'geolocation=(), microphone=(), camera=()');
+    next();
+  });
 
   const parseCookieToken = (cookieHeader: string | undefined, name: string) => {
     if (!cookieHeader) return '';
@@ -82,7 +91,7 @@ async function bootstrap() {
         db: Number(process.env.REDIS_DB ?? '0'),
       });
 
-  (app.getHttpAdapter().getInstance() as any).use('/admin', async (req: any, res: any, next: any) => {
+  express.use('/admin', async (req: any, res: any, next: any) => {
     const path = String(req.path ?? '');
     if (req.method === 'OPTIONS') return next();
     if (req.method === 'POST' && path === '/login') return next();

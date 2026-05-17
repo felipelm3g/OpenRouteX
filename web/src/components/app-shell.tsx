@@ -60,7 +60,7 @@ export function AppShell({
 
   const onLogout = () => {
     if (typeof document !== 'undefined') {
-      document.cookie = 'orx_token=; Path=/; Max-Age=0';
+      document.cookie = 'orx_token=; Path=/; Max-Age=0; SameSite=Lax; Priority=High';
     }
     window.location.href = '/';
   };

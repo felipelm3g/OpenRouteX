@@ -38,9 +38,19 @@ export class CertificatesService {
   ) {}
 
   private getEncKey() {
-    const fallback = `${process.env.ADMIN_USER ?? 'admin'}:${process.env.ADMIN_PASSWORD ?? 'admin'}`;
-    const material = String(process.env.CERTS_ENC_KEY ?? fallback);
-    if (!material.trim()) throw new ServiceUnavailableException('CERTS_ENC_KEY não configurada');
+    const allowInsecureDefaults = String(process.env.ORX_ALLOW_INSECURE_DEFAULTS ?? '').trim().toLowerCase() === 'true';
+    const fromEnv = String(process.env.CERTS_ENC_KEY ?? '').trim();
+    if (fromEnv) return createHash('sha256').update(fromEnv).digest();
+
+    const adminPassword = String(process.env.ADMIN_PASSWORD ?? 'admin').trim();
+    const weakDefaults = new Set(['admin123', 'admin', 'password', 'changeme', 'change_me', '123456', '12345678']);
+    if (!allowInsecureDefaults && weakDefaults.has(adminPassword.toLowerCase())) {
+      throw new ServiceUnavailableException('CERTS_ENC_KEY não configurada. Defina uma chave forte para criptografar certificados.');
+    }
+
+    const fallback = `${process.env.ADMIN_USER ?? 'admin'}:${adminPassword}`;
+    if (!fallback.trim()) throw new ServiceUnavailableException('CERTS_ENC_KEY não configurada');
+    const material = fallback;
     return createHash('sha256').update(material).digest();
   }
 

@@ -13,6 +13,100 @@ export class LoggingService {
     private readonly logRepo: Repository<RequestLogEntity>,
   ) {}
 
+  private headerValue(headers: Record<string, string | string[]> | null | undefined, key: string) {
+    if (!headers) return null;
+    const lk = key.toLowerCase();
+    for (const [k, v] of Object.entries(headers)) {
+      if (k.toLowerCase() !== lk) continue;
+      if (Array.isArray(v)) return v.join(',');
+      return String(v);
+    }
+    return null;
+  }
+
+  private redactHeaders(
+    headers: Record<string, string | string[]>,
+    extraSensitiveKeys?: string[],
+  ): Record<string, string | string[]> {
+    const baseSensitive = [
+      'authorization',
+      'proxy-authorization',
+      'cookie',
+      'set-cookie',
+      'x-api-key',
+      'api-key',
+    ];
+    const sensitive = new Set(
+      [...baseSensitive, ...(extraSensitiveKeys ?? [])]
+        .map((h) => String(h ?? '').trim().toLowerCase())
+        .filter(Boolean),
+    );
+
+    const out: Record<string, string | string[]> = {};
+    for (const [k, v] of Object.entries(headers ?? {})) {
+      const lk = k.toLowerCase();
+      if (sensitive.has(lk)) {
+        out[k] = '[redacted]';
+        continue;
+      }
+      out[k] = v as any;
+    }
+    return out;
+  }
+
+  private redactBody(
+    body: Buffer | null,
+    headers: Record<string, string | string[]> | null | undefined,
+  ): Buffer | null {
+    if (!body) return null;
+
+    const maxBytesRaw = Number(process.env.ORX_LOG_BODY_MAX_BYTES ?? '262144');
+    const maxBytes = Number.isFinite(maxBytesRaw) ? Math.max(0, Math.min(10 * 1024 * 1024, maxBytesRaw)) : 262144;
+    const truncated = maxBytes > 0 && body.length > maxBytes ? body.subarray(0, maxBytes) : body;
+
+    const redactBodies = String(process.env.ORX_LOG_REDACT_BODIES ?? '').trim().toLowerCase() !== 'false';
+    if (!redactBodies) return truncated;
+
+    const contentType = (this.headerValue(headers, 'content-type') ?? '').toLowerCase();
+    const asText = truncated.toString('utf8');
+
+    const shouldRedactKey = (k: string) =>
+      /pass(word)?|token|secret|api[_-]?key|client_secret|authorization|refresh_token|access_token/i.test(k);
+
+    if (contentType.includes('application/json')) {
+      try {
+        const json = JSON.parse(asText) as any;
+        const walk = (v: any): any => {
+          if (!v || typeof v !== 'object') return v;
+          if (Array.isArray(v)) return v.map(walk);
+          const out: Record<string, any> = {};
+          for (const [k, val] of Object.entries(v)) {
+            out[k] = shouldRedactKey(k) ? '[redacted]' : walk(val);
+          }
+          return out;
+        };
+        const redacted = JSON.stringify(walk(json));
+        return Buffer.from(redacted, 'utf8');
+      } catch {
+        return truncated;
+      }
+    }
+
+    if (contentType.includes('application/x-www-form-urlencoded')) {
+      try {
+        const params = new URLSearchParams(asText);
+        for (const k of Array.from(params.keys())) {
+          if (shouldRedactKey(k)) params.set(k, '[redacted]');
+        }
+        return Buffer.from(params.toString(), 'utf8');
+      } catch {
+        return truncated;
+      }
+    }
+
+    return truncated;
+  }
+
   async createBaseLog(params: {
     requestId: string;
     apiKey: string | null;
@@ -22,7 +116,10 @@ export class LoggingService {
     originalUrl: string;
     requestHeaders: Record<string, string | string[]>;
     requestBody: Buffer | null;
+    redactHeaders?: string[];
   }) {
+    const requestHeaders = this.redactHeaders(params.requestHeaders, params.redactHeaders);
+    const requestBody = this.redactBody(params.requestBody, requestHeaders);
     const log = this.logRepo.create({
       requestId: params.requestId,
       apiKey: params.apiKey,
@@ -30,8 +127,8 @@ export class LoggingService {
       publicPath: params.publicPath,
       method: params.method,
       originalUrl: params.originalUrl,
-      requestHeaders: params.requestHeaders,
-      requestBody: params.requestBody,
+      requestHeaders,
+      requestBody,
     });
     return this.logRepo.save(log);
   }
@@ -42,13 +139,16 @@ export class LoggingService {
     responseBody: Buffer | null;
     statusCode: number | null;
     durationMs: number | null;
+    redactHeaders?: string[];
   }) {
+    const responseHeaders = this.redactHeaders(params.responseHeaders, params.redactHeaders);
+    const responseBody = this.redactBody(params.responseBody, responseHeaders);
     await this.logRepo.update(
       { id },
       {
         finalUrl: params.finalUrl,
-        responseHeaders: params.responseHeaders,
-        responseBody: params.responseBody,
+        responseHeaders,
+        responseBody,
         statusCode: params.statusCode,
         durationMs: params.durationMs,
         responseAt: new Date(),
@@ -167,19 +267,8 @@ export class LoggingService {
     const row = await this.logRepo.findOne({ where: { id } });
     if (!row) return null;
 
-    const headerValue = (headers: Record<string, string | string[]> | null | undefined, key: string) => {
-      if (!headers) return null;
-      const lk = key.toLowerCase();
-      for (const [k, v] of Object.entries(headers)) {
-        if (k.toLowerCase() !== lk) continue;
-        if (Array.isArray(v)) return v.join(',');
-        return String(v);
-      }
-      return null;
-    };
-
     const maybeDecompress = (b: Buffer, headers: Record<string, string | string[]> | null | undefined) => {
-      const enc = (headerValue(headers, 'content-encoding') ?? '').toLowerCase();
+      const enc = (this.headerValue(headers, 'content-encoding') ?? '').toLowerCase();
       if (!enc) return b;
       try {
         if (enc.includes('gzip')) return gunzipSync(b);
@@ -217,7 +306,7 @@ export class LoggingService {
       if (b.length === 0) return '';
       if (b.length > 256 * 1024) return `[binary payload truncated: ${b.length} bytes]`;
       const buf = maybeDecompress(b, headers);
-      const contentType = (headerValue(headers, 'content-type') ?? '').toLowerCase();
+      const contentType = (this.headerValue(headers, 'content-type') ?? '').toLowerCase();
       const wantsText =
         contentType.includes('application/json') ||
         contentType.includes('text/') ||
@@ -226,7 +315,7 @@ export class LoggingService {
         contentType.includes('application/x-www-form-urlencoded');
 
       if (!wantsText && !isProbablyText(buf)) {
-        const enc = headerValue(headers, 'content-encoding');
+        const enc = this.headerValue(headers, 'content-encoding');
         return `[binary payload: ${buf.length} bytes${enc ? `, content-encoding=${enc}` : ''}]`;
       }
 
