@@ -309,8 +309,11 @@ export class LoggingService {
       const contentType = (this.headerValue(headers, 'content-type') ?? '').toLowerCase();
       const wantsText =
         contentType.includes('application/json') ||
+        contentType.includes('+json') ||
         contentType.includes('text/') ||
         contentType.includes('application/xml') ||
+        contentType.includes('text/xml') ||
+        contentType.includes('+xml') ||
         contentType.includes('application/xhtml+xml') ||
         contentType.includes('application/x-www-form-urlencoded');
 
@@ -319,7 +322,46 @@ export class LoggingService {
         return `[binary payload: ${buf.length} bytes${enc ? `, content-encoding=${enc}` : ''}]`;
       }
 
+      const prettyJson = (txt: string) => {
+        try {
+          const parsed = JSON.parse(txt) as unknown;
+          return JSON.stringify(parsed, null, 2);
+        } catch {
+          return txt;
+        }
+      };
+
+      const prettyXml = (txt: string) => {
+        const raw = String(txt ?? '').trim();
+        if (!raw) return raw;
+        const normalized = raw.replace(/>\s*</g, '>\n<');
+        const lines = normalized.split('\n').map((l) => l.trim()).filter(Boolean);
+        let indent = 0;
+        const out: string[] = [];
+
+        for (const line of lines) {
+          const isDecl = line.startsWith('<?') || line.startsWith('<!');
+          const isClosing = line.startsWith('</');
+          const isSelfClosing = /\/>\s*$/.test(line);
+          const isOpenTag =
+            !isDecl &&
+            !isClosing &&
+            line.startsWith('<') &&
+            line.endsWith('>') &&
+            !isSelfClosing &&
+            !line.includes('</');
+
+          if (isClosing) indent = Math.max(0, indent - 1);
+          out.push(`${'  '.repeat(indent)}${line}`);
+          if (isOpenTag) indent += 1;
+        }
+
+        return out.join('\n');
+      };
+
       const txt = buf.toString('utf8');
+      if (contentType.includes('json')) return prettyJson(txt);
+      if (contentType.includes('xml')) return prettyXml(txt);
       return txt;
     };
 
