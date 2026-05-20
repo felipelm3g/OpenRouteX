@@ -37,6 +37,9 @@ export class PathEntity {
   @Column({ type: 'boolean', default: true })
   enabled!: boolean;
 
+  @Column({ type: 'boolean', default: true })
+  requireClientAuth!: boolean;
+
   @Column({ type: 'jsonb', default: {} })
   addHeaders!: Record<string, string>;
 

@@ -2,6 +2,7 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 
+import { VariableResolverService } from '../../core/variable-resolver/variable-resolver.service';
 import { SettingsService } from '../settings/settings.service';
 
 import { CreatePathDto, UpdatePathDto } from './dto/path.dto';
@@ -13,7 +14,25 @@ export class PathsService {
     @InjectRepository(PathEntity)
     private readonly pathRepo: Repository<PathEntity>,
     private readonly settings: SettingsService,
+    private readonly variables: VariableResolverService,
   ) {}
+
+  private assertNoVariablesWhenPublic(params: {
+    requireClientAuth: boolean;
+    targetUrlTemplate: string;
+    addHeaders: Record<string, string>;
+    addQuery: Record<string, string>;
+  }) {
+    if (params.requireClientAuth) return;
+    const used = new Set<string>();
+    for (const v of this.variables.detectVariables(params.targetUrlTemplate)) used.add(v);
+    for (const v of this.variables.detectVariablesInRecord(params.addHeaders)) used.add(v);
+    for (const v of this.variables.detectVariablesInRecord(params.addQuery)) used.add(v);
+    if (used.size === 0) return;
+    throw new BadRequestException(
+      `Rotas sem API-KEY não podem usar variáveis. Remova: ${Array.from(used).sort().join(', ')}`,
+    );
+  }
 
   async list(params?: { apiId?: string }) {
     const where: { apiId?: string } = {};
@@ -35,11 +54,21 @@ export class PathsService {
 
   async create(dto: CreatePathDto) {
     const cfg = await this.settings.getSettings();
+    const addHeaders = dto.addHeaders ?? {};
+    const addQuery = dto.addQuery ?? {};
+    const requireClientAuth = dto.requireClientAuth ?? true;
+    this.assertNoVariablesWhenPublic({
+      requireClientAuth,
+      targetUrlTemplate: dto.targetUrlTemplate,
+      addHeaders,
+      addQuery,
+    });
     const path = this.pathRepo.create({
       ...dto,
       enabled: dto.enabled ?? true,
-      addHeaders: dto.addHeaders ?? {},
-      addQuery: dto.addQuery ?? {},
+      requireClientAuth,
+      addHeaders,
+      addQuery,
       forwardClientQuery: dto.forwardClientQuery ?? cfg.defaultForwardClientQuery,
     });
     try {
@@ -59,6 +88,13 @@ export class PathsService {
     Object.assign(path, dto);
     if (dto.addHeaders) path.addHeaders = dto.addHeaders;
     if (dto.addQuery) path.addQuery = dto.addQuery;
+    const requireClientAuth = path.requireClientAuth ?? true;
+    this.assertNoVariablesWhenPublic({
+      requireClientAuth,
+      targetUrlTemplate: path.targetUrlTemplate,
+      addHeaders: path.addHeaders ?? {},
+      addQuery: path.addQuery ?? {},
+    });
     try {
       return await this.pathRepo.save(path);
     } catch (e: any) {

@@ -106,7 +106,8 @@ export class ProxyService {
 
     const cfg = await this.settings.getSettings();
     const apiKeyHeader = String(cfg.apiKeyHeaderName ?? 'API-KEY').trim() || 'API-KEY';
-    const apiKeyValue = String(req.header(apiKeyHeader) ?? '').trim();
+    const requireClientAuth = path.requireClientAuth !== false;
+    const apiKeyValue = requireClientAuth ? String(req.header(apiKeyHeader) ?? '').trim() : '';
     const blocked = new Set<string>([
       ...Array.from(HOP_BY_HOP),
       apiKeyHeader.toLowerCase(),
@@ -114,7 +115,7 @@ export class ProxyService {
     ]);
     const baseLog = await this.logs.createBaseLog({
       requestId,
-      apiKey: apiKeyValue || null,
+      apiKey: requireClientAuth && apiKeyValue ? apiKeyValue : null,
       apiSlug,
       publicPath,
       method: req.method,
@@ -125,38 +126,64 @@ export class ProxyService {
     });
 
     try {
-      if (!apiKeyValue) {
-        const hasAny = await this.apiKeys.hasAny();
-        if (!hasAny) {
-          throw new ServiceUnavailableException(
-            'Nenhuma API Key cadastrada. Crie uma em /admin/apikeys antes de usar o gateway.',
-          );
+      let apiKeyBindings: Record<string, string> = {};
+      if (requireClientAuth) {
+        if (!apiKeyValue) {
+          const hasAny = await this.apiKeys.hasAny();
+          if (!hasAny) {
+            throw new ServiceUnavailableException(
+              'Nenhuma API Key cadastrada. Crie uma em /admin/apikeys antes de usar o gateway.',
+            );
+          }
+          throw new ForbiddenException('API-KEY obrigatório');
         }
-        throw new ForbiddenException('API-KEY obrigatório');
-      }
-      const apiKey = await this.apiKeys.getByKey(apiKeyValue);
+        const apiKey = await this.apiKeys.getByKey(apiKeyValue);
 
-      if (apiKey.allowedApis && apiKey.allowedApis.length > 0) {
-        if (!apiKey.allowedApis.includes(api.slug)) {
-          throw new ForbiddenException('API não permitida para esta API Key');
+        if (apiKey.allowedApis && apiKey.allowedApis.length > 0) {
+          if (!apiKey.allowedApis.includes(api.slug)) {
+            throw new ForbiddenException('API não permitida para esta API Key');
+          }
         }
-      }
 
-      const rl = await this.rateLimit.hit(apiKey.key, apiKey.requestsPerMinute);
-      res.setHeader('X-RateLimit-Limit', String(apiKey.requestsPerMinute));
-      res.setHeader('X-RateLimit-Remaining', String(rl.remaining));
-      res.setHeader('X-RateLimit-Reset', String(rl.resetSeconds));
-      if (!rl.allowed) {
-        res.status(429).json({ error: 'rate_limited' });
-        await this.logs.finalizeLog(baseLog.id, {
-          finalUrl: null,
-          responseHeaders: { 'content-type': 'application/json' },
-          responseBody: Buffer.from(JSON.stringify({ error: 'rate_limited' })),
-          statusCode: 429,
-          durationMs: Date.now() - startedAt,
-          redactHeaders: [apiKeyHeader],
-        });
-        return;
+        const rl = await this.rateLimit.hit(apiKey.key, apiKey.requestsPerMinute);
+        res.setHeader('X-RateLimit-Limit', String(apiKey.requestsPerMinute));
+        res.setHeader('X-RateLimit-Remaining', String(rl.remaining));
+        res.setHeader('X-RateLimit-Reset', String(rl.resetSeconds));
+        if (!rl.allowed) {
+          res.status(429).json({ error: 'rate_limited' });
+          await this.logs.finalizeLog(baseLog.id, {
+            finalUrl: null,
+            responseHeaders: { 'content-type': 'application/json' },
+            responseBody: Buffer.from(JSON.stringify({ error: 'rate_limited' })),
+            statusCode: 429,
+            durationMs: Date.now() - startedAt,
+            redactHeaders: [apiKeyHeader],
+          });
+          return;
+        }
+
+        apiKeyBindings = apiKey.variableBindings;
+      } else {
+        const limit = Number(process.env.ORX_PUBLIC_RATE_LIMIT_RPM ?? '60');
+        if (Number.isFinite(limit) && limit > 0) {
+          const key = `public:${api.slug}:${path.id}`;
+          const rl = await this.rateLimit.hit(key, limit);
+          res.setHeader('X-RateLimit-Limit', String(limit));
+          res.setHeader('X-RateLimit-Remaining', String(rl.remaining));
+          res.setHeader('X-RateLimit-Reset', String(rl.resetSeconds));
+          if (!rl.allowed) {
+            res.status(429).json({ error: 'rate_limited' });
+            await this.logs.finalizeLog(baseLog.id, {
+              finalUrl: null,
+              responseHeaders: { 'content-type': 'application/json' },
+              responseBody: Buffer.from(JSON.stringify({ error: 'rate_limited' })),
+              statusCode: 429,
+              durationMs: Date.now() - startedAt,
+              redactHeaders: [apiKeyHeader],
+            });
+            return;
+          }
+        }
       }
 
       const targetTemplate = path.targetUrlTemplate;
@@ -188,7 +215,7 @@ export class ProxyService {
         addQuery: Object.fromEntries(
           Object.entries(path.addQuery ?? {}).map(([k, v]) => [k, String(v)]),
         ),
-        apiKeyBindings: apiKey.variableBindings,
+        apiKeyBindings,
         auth,
         timeoutMs,
         tls,

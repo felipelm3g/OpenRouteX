@@ -21,6 +21,7 @@ type Path = {
   targetUrlTemplate: string;
   authId: string | null;
   enabled: boolean;
+  requireClientAuth: boolean;
   addHeaders: Record<string, string>;
   addQuery: Record<string, string>;
   forwardClientQuery: boolean;
@@ -63,6 +64,7 @@ export default function PathsPage() {
   const [targetUrlTemplate, setTargetUrlTemplate] = useState('https://external.com/{CONTA}/dados');
   const [authId, setAuthId] = useState<string>('');
   const [enabled, setEnabled] = useState(true);
+  const [requireClientAuth, setRequireClientAuth] = useState(true);
   const [forwardClientQuery, setForwardClientQuery] = useState(true);
   const [addHeadersText, setAddHeadersText] = useState('{}');
   const [addQueryText, setAddQueryText] = useState('{}');
@@ -117,6 +119,7 @@ export default function PathsPage() {
     setTargetUrlTemplate('https://external.com/{CONTA}/dados');
     setAuthId('');
     setEnabled(true);
+    setRequireClientAuth(true);
     setForwardClientQuery(defaultForward);
     setAddHeadersText('{}');
     setAddQueryText('{}');
@@ -137,6 +140,7 @@ export default function PathsPage() {
     setTargetUrlTemplate(p.targetUrlTemplate);
     setAuthId(p.authId ?? '');
     setEnabled(Boolean(p.enabled));
+    setRequireClientAuth(p.requireClientAuth !== false);
     setForwardClientQuery(p.forwardClientQuery !== false);
     setAddHeadersText(JSON.stringify(p.addHeaders ?? {}, null, 2));
     setAddQueryText(JSON.stringify(p.addQuery ?? {}, null, 2));
@@ -175,6 +179,7 @@ export default function PathsPage() {
         targetUrlTemplate,
         authId: authId || null,
         enabled,
+        requireClientAuth,
         addHeaders: parsedAdds.headers,
         addQuery: parsedAdds.query,
         forwardClientQuery,
@@ -422,32 +427,57 @@ export default function PathsPage() {
             </div>
           </div>
 
-          <div className="sm:col-span-2">
-            <div className="text-xs font-medium text-white/70">Enabled</div>
-            <div className="mt-2 flex items-center gap-2">
-              <button
-                type="button"
-                className="inline-flex h-10 items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 text-sm text-white/80"
-                onClick={() => setEnabled((p: boolean) => !p)}
-              >
-                <span className={`h-2.5 w-2.5 rounded-full ${enabled ? 'bg-emerald-400' : 'bg-rose-400'}`} />
-                {enabled ? 'Enabled' : 'Disabled'}
-              </button>
+          <div className="sm:col-span-2 grid gap-3 sm:grid-cols-3">
+            <div>
+              <div className="text-xs font-medium text-white/70">Enabled</div>
+              <div className="mt-2 flex items-center gap-2">
+                <button
+                  type="button"
+                  className="inline-flex h-10 w-full items-center justify-between gap-2 rounded-xl border border-white/10 bg-white/5 px-3 text-sm text-white/80"
+                  onClick={() => setEnabled((p: boolean) => !p)}
+                >
+                  <span className="flex items-center gap-2">
+                    <span className={`h-2.5 w-2.5 rounded-full ${enabled ? 'bg-emerald-400' : 'bg-rose-400'}`} />
+                    {enabled ? 'Enabled' : 'Disabled'}
+                  </span>
+                </button>
+              </div>
+            </div>
+
+            <div>
+              <div className="text-xs font-medium text-white/70">Solicitar API-KEY</div>
+              <div className="mt-2 flex items-center gap-2">
+                <button
+                  type="button"
+                  className="inline-flex h-10 w-full items-center justify-between gap-2 rounded-xl border border-white/10 bg-white/5 px-3 text-sm text-white/80"
+                  onClick={() => setRequireClientAuth((p: boolean) => !p)}
+                >
+                  <span className="flex items-center gap-2">
+                    <span className={`h-2.5 w-2.5 rounded-full ${requireClientAuth ? 'bg-emerald-400' : 'bg-rose-400'}`} />
+                    {requireClientAuth ? 'Enabled' : 'Disabled'}
+                  </span>
+                </button>
+              </div>
+            </div>
+
+            <div>
+              <div className="text-xs font-medium text-white/70">Forward query params</div>
+              <div className="mt-2 flex items-center gap-2">
+                <button
+                  type="button"
+                  className="inline-flex h-10 w-full items-center justify-between gap-2 rounded-xl border border-white/10 bg-white/5 px-3 text-sm text-white/80"
+                  onClick={() => setForwardClientQuery((p: boolean) => !p)}
+                >
+                  <span className="flex items-center gap-2">
+                    <span className={`h-2.5 w-2.5 rounded-full ${forwardClientQuery ? 'bg-emerald-400' : 'bg-rose-400'}`} />
+                    {forwardClientQuery ? 'Enabled' : 'Disabled'}
+                  </span>
+                </button>
+              </div>
             </div>
           </div>
 
           <div className="sm:col-span-2">
-            <div className="text-xs font-medium text-white/70">Forward query params</div>
-            <div className="mt-2 flex items-center gap-2">
-              <button
-                type="button"
-                className="inline-flex h-10 items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 text-sm text-white/80"
-                onClick={() => setForwardClientQuery((p: boolean) => !p)}
-              >
-                <span className={`h-2.5 w-2.5 rounded-full ${forwardClientQuery ? 'bg-emerald-400' : 'bg-rose-400'}`} />
-                {forwardClientQuery ? 'Enabled' : 'Disabled'}
-              </button>
-            </div>
             <div className="mt-2 text-xs text-white/50">
               Quando ativo, query params do cliente (ex: ?id=123) são repassados para a URL destino.
             </div>

@@ -31,6 +31,10 @@ export class CreatePathDto {
   enabled?: boolean;
 
   @IsOptional()
+  @IsBoolean()
+  requireClientAuth?: boolean;
+
+  @IsOptional()
   @IsObject()
   addHeaders?: Record<string, string>;
 
@@ -81,6 +85,10 @@ export class UpdatePathDto {
   @IsOptional()
   @IsBoolean()
   enabled?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  requireClientAuth?: boolean;
 
   @IsOptional()
   @IsObject()
