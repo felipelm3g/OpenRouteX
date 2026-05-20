@@ -148,6 +148,23 @@ export default function PathsPage() {
     setOpen(true);
   }, []);
 
+  const beginDuplicate = useCallback((p: Path) => {
+    setEditing(null);
+    setApiId(p.apiId);
+    setName(p.name);
+    setPublicPath(p.publicPath);
+    setMethod(p.method);
+    setTargetUrlTemplate(p.targetUrlTemplate);
+    setAuthId(p.authId ?? '');
+    setEnabled(Boolean(p.enabled));
+    setRequireClientAuth(p.requireClientAuth !== false);
+    setForwardClientQuery(p.forwardClientQuery !== false);
+    setAddHeadersText(JSON.stringify(p.addHeaders ?? {}, null, 2));
+    setAddQueryText(JSON.stringify(p.addQuery ?? {}, null, 2));
+    setTimeoutSeconds(p.timeoutSeconds ? String(p.timeoutSeconds) : '');
+    setOpen(true);
+  }, []);
+
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const v = new URLSearchParams(window.location.search).get('focus') ?? '';
@@ -304,12 +321,27 @@ export default function PathsPage() {
                 filterValue: (r) => (r.enabled ? 'enabled' : 'disabled'),
               },
               {
+                key: 'clientAuth',
+                header: 'Solicitar API-KEY',
+                render: (r) =>
+                  r.requireClientAuth !== false ? (
+                    <Badge tone="neutral">Required</Badge>
+                  ) : (
+                    <Badge tone="danger">Public</Badge>
+                  ),
+                sortValue: (r) => (r.requireClientAuth !== false ? 1 : 0),
+                filterValue: (r) => (r.requireClientAuth !== false ? 'required' : 'public'),
+              },
+              {
                 key: 'actions',
                 header: 'Actions',
                 render: (r) => (
                   <div className="flex items-center gap-2">
                     <Button variant="secondary" size="sm" onClick={() => beginEdit(r)}>
                       Edit
+                    </Button>
+                    <Button variant="secondary" size="sm" onClick={() => beginDuplicate(r)}>
+                      Duplicar
                     </Button>
                     <Button variant="danger" size="sm" onClick={() => askDelete(r)} disabled={del.isPending}>
                       Delete
@@ -331,6 +363,9 @@ export default function PathsPage() {
                 <div className="mt-2 flex items-center gap-2">
                   <Button variant="secondary" size="sm" onClick={() => beginEdit(r)}>
                     Edit
+                  </Button>
+                  <Button variant="secondary" size="sm" onClick={() => beginDuplicate(r)}>
+                    Duplicar
                   </Button>
                   <Button variant="danger" size="sm" onClick={() => askDelete(r)} disabled={del.isPending}>
                     Delete
