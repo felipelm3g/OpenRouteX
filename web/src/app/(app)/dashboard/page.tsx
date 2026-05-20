@@ -409,35 +409,6 @@ export default function DashboardPage() {
         </Card>
       </div>
 
-      <Card className="mt-4">
-        <CardHeader
-          title="Filtros"
-          description="Filtre por slug, rota, status e janela de data/hora."
-          right={
-            <div className="flex items-center gap-2">
-              <Button variant="secondary" size="sm" onClick={() => void downloadLogs('csv')}>
-                Export CSV
-              </Button>
-              <Button variant="secondary" size="sm" onClick={() => void downloadLogs('json')}>
-                Export JSON
-              </Button>
-              <div className="text-xs text-white/55">
-                {listQ.isPending ? 'Carregando…' : `Atualiza a cada ${Math.max(1, Math.round(logsRefetch / 1000))}s`}
-              </div>
-            </div>
-          }
-        />
-        <CardBody>
-          <div className="grid gap-3 lg:grid-cols-5">
-            <Select value={api} onChange={setApi} options={apiOptions} />
-            <Select value={path} onChange={setPath} options={pathOptions} />
-            <Select value={status} onChange={setStatus} options={statusOptions} />
-            <TextInput value={from} onChange={setFrom} placeholder="From" type="datetime-local" />
-            <TextInput value={to} onChange={setTo} placeholder="To" type="datetime-local" />
-          </div>
-        </CardBody>
-      </Card>
-
       <div className="mt-4 grid gap-4 lg:grid-cols-3">
         <Card className="lg:col-span-2">
           <CardHeader
@@ -509,6 +480,35 @@ export default function DashboardPage() {
           </CardBody>
         </Card>
       </div>
+
+      <Card className="mt-4">
+        <CardHeader
+          title="Filtros"
+          description="Filtre por slug, rota, status e janela de data/hora."
+          right={
+            <div className="flex items-center gap-2">
+              <Button variant="secondary" size="sm" onClick={() => void downloadLogs('csv')}>
+                Export CSV
+              </Button>
+              <Button variant="secondary" size="sm" onClick={() => void downloadLogs('json')}>
+                Export JSON
+              </Button>
+              <div className="text-xs text-white/55">
+                {listQ.isPending ? 'Carregando…' : `Atualiza a cada ${Math.max(1, Math.round(logsRefetch / 1000))}s`}
+              </div>
+            </div>
+          }
+        />
+        <CardBody>
+          <div className="grid gap-3 lg:grid-cols-5">
+            <Select value={api} onChange={setApi} options={apiOptions} />
+            <Select value={path} onChange={setPath} options={pathOptions} />
+            <Select value={status} onChange={setStatus} options={statusOptions} />
+            <TextInput value={from} onChange={setFrom} placeholder="From" type="datetime-local" />
+            <TextInput value={to} onChange={setTo} placeholder="To" type="datetime-local" />
+          </div>
+        </CardBody>
+      </Card>
 
       <Card className="mt-4">
         <CardHeader title="Execuções" description="Lista em tempo real (clique para ver detalhes)." />
