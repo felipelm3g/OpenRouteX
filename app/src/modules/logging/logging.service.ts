@@ -257,7 +257,7 @@ export class LoggingService {
       )
       .addSelect('AVG(l.durationMs)', 'avg')
       .addSelect('PERCENTILE_CONT(0.95) WITHIN GROUP (ORDER BY l.durationMs)', 'p95')
-      .where('l.apiSlug IS NOT NULL')
+      .andWhere('l.apiSlug IS NOT NULL')
       .andWhere('l.publicPath IS NOT NULL')
       .groupBy('l.apiSlug')
       .addGroupBy('l.publicPath')
@@ -311,7 +311,7 @@ export class LoggingService {
         'SUM(CASE WHEN l.statusCode IS NULL OR l.statusCode < 200 OR l.statusCode >= 300 THEN 1 ELSE 0 END)',
         'errors',
       )
-      .where('l.createdAt IS NOT NULL')
+      .andWhere('l.createdAt IS NOT NULL')
       .setParameter('tz', tz)
       .groupBy('dow')
       .addGroupBy('hour')
@@ -351,7 +351,7 @@ export class LoggingService {
       .clone()
       .select('l.apiSlug', 'value')
       .addSelect('COUNT(*)', 'count')
-      .where('l.apiSlug IS NOT NULL')
+      .andWhere('l.apiSlug IS NOT NULL')
       .groupBy('l.apiSlug')
       .orderBy('count', 'DESC')
       .getRawMany<{ value: string; count: string }>();
@@ -360,7 +360,7 @@ export class LoggingService {
       .clone()
       .select('l.publicPath', 'value')
       .addSelect('COUNT(*)', 'count')
-      .where('l.publicPath IS NOT NULL')
+      .andWhere('l.publicPath IS NOT NULL')
       .groupBy('l.publicPath')
       .orderBy('count', 'DESC')
       .getRawMany<{ value: string; count: string }>();
@@ -369,7 +369,7 @@ export class LoggingService {
       .clone()
       .select('l.statusCode', 'value')
       .addSelect('COUNT(*)', 'count')
-      .where('l.statusCode IS NOT NULL')
+      .andWhere('l.statusCode IS NOT NULL')
       .groupBy('l.statusCode')
       .orderBy('l.statusCode', 'ASC')
       .getRawMany<{ value: number; count: string }>();
