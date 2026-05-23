@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { DataTable } from '@/components/data-table';
+import { useI18n } from '@/components/i18n-provider';
 import { ConfirmModal, Modal } from '@/components/modal';
 import { Badge, Button, Card, CardBody, CardHeader, MethodBadge, PageShell, Select, TextInput, useToast } from '@/components/ui';
 import { apiFetch } from '@/lib/api';
@@ -36,6 +37,7 @@ function errorMessage(e: unknown) {
 }
 
 export default function PathsPage() {
+  const { t } = useI18n();
   const qc = useQueryClient();
   const toast = useToast();
   const [focus, setFocus] = useState('');
@@ -255,9 +257,9 @@ export default function PathsPage() {
 
   return (
     <PageShell
-      title="Rotas"
-      subtitle="Rotas públicas por API + method, com target URL template e auth. Variáveis {VAR} são resolvidas somente via API Key."
-      right={<Button onClick={beginCreate}>Criar Rota</Button>}
+      title={t('paths.title')}
+      subtitle={t('paths.subtitle')}
+      right={<Button onClick={beginCreate}>{t('paths.create')}</Button>}
     >
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="w-full sm:max-w-sm">
@@ -265,18 +267,18 @@ export default function PathsPage() {
             value={apiIdFilter}
             onChange={setApiIdFilter}
             options={[
-              { value: 'all', label: 'All APIs' },
+              { value: 'all', label: t('paths.allApis') },
               ...apis.map((a: Api) => ({ value: a.id, label: `${a.name} (/${a.slug})` })),
             ]}
           />
         </div>
         <div className="text-xs text-white/55">
-          {pathsQ.isPending ? 'Carregando…' : `${rows.length} paths`}
+          {pathsQ.isPending ? t('common.loading') : t('paths.count', { n: rows.length })}
         </div>
       </div>
 
       <Card>
-        <CardHeader title="Rotas" description="Tabela avançada (desktop) e cards (mobile)." />
+        <CardHeader title={t('paths.table.title')} description={t('paths.table.description')} />
         <CardBody>
           <DataTable<Path>
             rows={rows}
@@ -298,15 +300,15 @@ export default function PathsPage() {
               },
               {
                 key: 'path',
-                header: 'Path',
+                header: t('common.path'),
                 render: (r) => <div className="font-medium text-white/90">{r.publicPath}</div>,
                 sortValue: (r) => r.publicPath,
                 filterValue: (r) => `${r.publicPath} ${r.name}`,
               },
-              { key: 'method', header: 'Method', render: (r) => <MethodBadge method={r.method} />, sortValue: (r) => r.method, filterValue: (r) => r.method },
+              { key: 'method', header: t('common.method'), render: (r) => <MethodBadge method={r.method} />, sortValue: (r) => r.method, filterValue: (r) => r.method },
               {
                 key: 'target',
-                header: 'Target URL',
+                header: t('paths.table.targetUrl'),
                 render: (r) => (
                   <div className="max-w-[520px] truncate text-white/70">{r.targetUrlTemplate}</div>
                 ),
@@ -315,36 +317,36 @@ export default function PathsPage() {
               },
               {
                 key: 'enabled',
-                header: 'Status',
-                render: (r) => (r.enabled ? <Badge tone="success">Enabled</Badge> : <Badge tone="danger">Disabled</Badge>),
+                header: t('common.statusLabel'),
+                render: (r) => (r.enabled ? <Badge tone="success">{t('common.enabled')}</Badge> : <Badge tone="danger">{t('common.disabled')}</Badge>),
                 sortValue: (r) => (r.enabled ? 1 : 0),
                 filterValue: (r) => (r.enabled ? 'enabled' : 'disabled'),
               },
               {
                 key: 'clientAuth',
-                header: 'Solicitar API-KEY',
+                header: t('paths.table.clientAuth'),
                 render: (r) =>
                   r.requireClientAuth !== false ? (
-                    <Badge tone="neutral">Required</Badge>
+                    <Badge tone="neutral">{t('common.required')}</Badge>
                   ) : (
-                    <Badge tone="danger">Public</Badge>
+                    <Badge tone="danger">{t('common.public')}</Badge>
                   ),
                 sortValue: (r) => (r.requireClientAuth !== false ? 1 : 0),
                 filterValue: (r) => (r.requireClientAuth !== false ? 'required' : 'public'),
               },
               {
                 key: 'actions',
-                header: 'Actions',
+                header: t('common.actions'),
                 render: (r) => (
                   <div className="flex items-center gap-2">
                     <Button variant="secondary" size="sm" onClick={() => beginEdit(r)}>
-                      Edit
+                      {t('common.edit')}
                     </Button>
                     <Button variant="secondary" size="sm" onClick={() => beginDuplicate(r)}>
                       Duplicar
                     </Button>
                     <Button variant="danger" size="sm" onClick={() => askDelete(r)} disabled={del.isPending}>
-                      Delete
+                      {t('common.delete')}
                     </Button>
                   </div>
                 ),
@@ -354,7 +356,7 @@ export default function PathsPage() {
               <div className="grid gap-2">
                 <div className="flex items-center justify-between">
                   <MethodBadge method={r.method} />
-                  {r.enabled ? <Badge tone="success">Enabled</Badge> : <Badge tone="danger">Disabled</Badge>}
+                  {r.enabled ? <Badge tone="success">{t('common.enabled')}</Badge> : <Badge tone="danger">{t('common.disabled')}</Badge>}
                 </div>
                 <div className="text-sm font-medium text-white/90">{r.name}</div>
                 <div className="text-xs text-white/60">{apiLabelById[r.apiId] ?? r.apiId}</div>
@@ -362,18 +364,18 @@ export default function PathsPage() {
                 <div className="text-xs text-white/60 break-words">{r.targetUrlTemplate}</div>
                 <div className="mt-2 flex items-center gap-2">
                   <Button variant="secondary" size="sm" onClick={() => beginEdit(r)}>
-                    Edit
+                    {t('common.edit')}
                   </Button>
                   <Button variant="secondary" size="sm" onClick={() => beginDuplicate(r)}>
                     Duplicar
                   </Button>
                   <Button variant="danger" size="sm" onClick={() => askDelete(r)} disabled={del.isPending}>
-                    Delete
+                    {t('common.delete')}
                   </Button>
                 </div>
               </div>
             )}
-            empty="Sem paths ainda."
+            empty={t('paths.empty')}
           />
         </CardBody>
       </Card>
@@ -381,21 +383,21 @@ export default function PathsPage() {
       <Modal
         open={open}
         onClose={() => setOpen(false)}
-        title={editing ? 'Editar Rota' : 'Criar Rota'}
+        title={editing ? t('paths.modal.editTitle') : t('paths.modal.createTitle')}
         footer={
           <div className="flex items-center justify-end gap-2">
             <Button variant="secondary" onClick={() => setOpen(false)}>
-              Cancel
+              {t('common.cancel')}
             </Button>
             <Button onClick={() => save.mutate()} disabled={save.isPending}>
-              Save
+              {t('common.save')}
             </Button>
           </div>
         }
       >
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
-            <div className="text-xs font-medium text-white/70">API</div>
+            <div className="text-xs font-medium text-white/70">{t('paths.form.api')}</div>
             <div className="mt-2">
               <Select
                 value={apiId}
@@ -407,7 +409,7 @@ export default function PathsPage() {
             </div>
           </div>
           <div>
-            <div className="text-xs font-medium text-white/70">Method</div>
+            <div className="text-xs font-medium text-white/70">{t('paths.form.method')}</div>
             <div className="mt-2">
               <Select
                 value={method}
@@ -423,19 +425,19 @@ export default function PathsPage() {
             </div>
           </div>
           <div className="sm:col-span-2">
-            <div className="text-xs font-medium text-white/70">Name</div>
+            <div className="text-xs font-medium text-white/70">{t('paths.form.name')}</div>
             <div className="mt-2">
               <TextInput value={name} onChange={setName} placeholder="Ex: Dados Conta" />
             </div>
           </div>
           <div className="sm:col-span-2">
-            <div className="text-xs font-medium text-white/70">Public Path</div>
+            <div className="text-xs font-medium text-white/70">{t('paths.form.publicPath')}</div>
             <div className="mt-2">
               <TextInput value={publicPath} onChange={setPublicPath} placeholder="/dados" />
             </div>
           </div>
           <div className="sm:col-span-2">
-            <div className="text-xs font-medium text-white/70">Target URL Template</div>
+            <div className="text-xs font-medium text-white/70">{t('paths.form.targetUrlTemplate')}</div>
             <div className="mt-2">
               <TextInput
                 value={targetUrlTemplate}
@@ -444,18 +446,18 @@ export default function PathsPage() {
               />
             </div>
             <div className="mt-2 text-xs text-white/50">
-              Variáveis detectadas: {vars.length ? vars.join(', ') : '—'}
+              {t('paths.form.variablesDetected', { vars: vars.length ? vars.join(', ') : '—' })}
             </div>
           </div>
 
           <div className="sm:col-span-2">
-            <div className="text-xs font-medium text-white/70">Auth</div>
+            <div className="text-xs font-medium text-white/70">{t('paths.form.auth')}</div>
             <div className="mt-2">
               <Select
                 value={authId || 'none'}
                 onChange={(v) => setAuthId(v === 'none' ? '' : v)}
                 options={[
-                  { value: 'none', label: 'None' },
+                  { value: 'none', label: t('paths.form.none') },
                   ...auths.map((a: Auth) => ({ value: a.id, label: `${a.name} (${a.type})` })),
                 ]}
               />
@@ -464,7 +466,7 @@ export default function PathsPage() {
 
           <div className="sm:col-span-2 grid gap-3 sm:grid-cols-3">
             <div>
-              <div className="text-xs font-medium text-white/70">Enabled</div>
+              <div className="text-xs font-medium text-white/70">{t('paths.form.enabled')}</div>
               <div className="mt-2 flex items-center gap-2">
                 <button
                   type="button"
@@ -473,14 +475,14 @@ export default function PathsPage() {
                 >
                   <span className="flex items-center gap-2">
                     <span className={`h-2.5 w-2.5 rounded-full ${enabled ? 'bg-emerald-400' : 'bg-rose-400'}`} />
-                    {enabled ? 'Enabled' : 'Disabled'}
+                    {enabled ? t('common.enabled') : t('common.disabled')}
                   </span>
                 </button>
               </div>
             </div>
 
             <div>
-              <div className="text-xs font-medium text-white/70">Solicitar API-KEY</div>
+              <div className="text-xs font-medium text-white/70">{t('paths.form.requireClientAuth')}</div>
               <div className="mt-2 flex items-center gap-2">
                 <button
                   type="button"
@@ -489,14 +491,14 @@ export default function PathsPage() {
                 >
                   <span className="flex items-center gap-2">
                     <span className={`h-2.5 w-2.5 rounded-full ${requireClientAuth ? 'bg-emerald-400' : 'bg-rose-400'}`} />
-                    {requireClientAuth ? 'Enabled' : 'Disabled'}
+                    {requireClientAuth ? t('common.enabled') : t('common.disabled')}
                   </span>
                 </button>
               </div>
             </div>
 
             <div>
-              <div className="text-xs font-medium text-white/70">Forward query params</div>
+              <div className="text-xs font-medium text-white/70">{t('paths.form.forwardQuery')}</div>
               <div className="mt-2 flex items-center gap-2">
                 <button
                   type="button"
@@ -505,7 +507,7 @@ export default function PathsPage() {
                 >
                   <span className="flex items-center gap-2">
                     <span className={`h-2.5 w-2.5 rounded-full ${forwardClientQuery ? 'bg-emerald-400' : 'bg-rose-400'}`} />
-                    {forwardClientQuery ? 'Enabled' : 'Disabled'}
+                    {forwardClientQuery ? t('common.enabled') : t('common.disabled')}
                   </span>
                 </button>
               </div>
@@ -519,7 +521,7 @@ export default function PathsPage() {
           </div>
 
           <div className="sm:col-span-2">
-            <div className="text-xs font-medium text-white/70">Timeout (seconds)</div>
+            <div className="text-xs font-medium text-white/70">{t('paths.form.timeoutSeconds')}</div>
             <div className="mt-2">
               <TextInput
                 value={timeoutSeconds}
@@ -536,7 +538,7 @@ export default function PathsPage() {
 
         <div className="mt-5 grid gap-4 lg:grid-cols-2">
           <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-            <div className="text-xs font-medium text-white/70">Add Headers (JSON)</div>
+            <div className="text-xs font-medium text-white/70">{t('paths.form.addHeaders')}</div>
             <textarea
               value={addHeadersText}
               onChange={(e) => setAddHeadersText(e.target.value)}
@@ -547,7 +549,7 @@ export default function PathsPage() {
             </div>
           </div>
           <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-            <div className="text-xs font-medium text-white/70">Add Query (JSON)</div>
+            <div className="text-xs font-medium text-white/70">{t('paths.form.addQuery')}</div>
             <textarea
               value={addQueryText}
               onChange={(e) => setAddQueryText(e.target.value)}

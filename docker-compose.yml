@@ -4,6 +4,7 @@ x-url-backend: &url_backend localhost
 x-admin-user: &admin_user admin
 x-admin-password: &admin_password CHANGE_ME
 x-admin-email: &admin_email admin@example.com
+x-postgres-password: &pg_password CHANGE_ME
 
 services:
   postgres:
@@ -16,7 +17,7 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_USER: openroutex
-      POSTGRES_PASSWORD: openroutex
+      POSTGRES_PASSWORD: *pg_password
       POSTGRES_DB: openroutex
     volumes:
       - openroutex_postgres:/var/lib/postgresql/data
@@ -65,7 +66,7 @@ services:
       PGHOST: postgres
       PGPORT: "5432"
       PGUSER: openroutex
-      PGPASSWORD: openroutex
+      PGPASSWORD: *pg_password
       PGDATABASE: openroutex
       REDIS_HOST: redis
       REDIS_PORT: "6379"

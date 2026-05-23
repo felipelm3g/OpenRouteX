@@ -217,9 +217,121 @@ export class LoggingService {
       .getMany();
   }
 
+  async endpointReport(params?: {
+    apiSlug?: string;
+    publicPath?: string;
+    method?: string;
+    statusCode?: number;
+    status?: string;
+    from?: Date;
+    to?: Date;
+    limit?: number;
+  }) {
+    const limit = Math.min(500, Math.max(1, params?.limit ?? 100));
+
+    const qb = this.logRepo.createQueryBuilder('l');
+    if (params?.from) qb.andWhere('l.createdAt >= :from', { from: params.from });
+    if (params?.to) qb.andWhere('l.createdAt <= :to', { to: params.to });
+    if (params?.apiSlug) qb.andWhere('l.apiSlug = :apiSlug', { apiSlug: params.apiSlug });
+    if (params?.publicPath) qb.andWhere('l.publicPath = :publicPath', { publicPath: params.publicPath });
+    if (params?.method) qb.andWhere('l.method = :method', { method: params.method });
+    if (params?.statusCode) qb.andWhere('l.statusCode = :statusCode', { statusCode: params.statusCode });
+    if (params?.status) {
+      const s = String(params.status).toLowerCase();
+      if (s === 'success') qb.andWhere('l.statusCode >= 200 AND l.statusCode < 300');
+      if (s === 'error') qb.andWhere('(l.statusCode IS NULL OR l.statusCode < 200 OR l.statusCode >= 300)');
+    }
+
+    const rows = await qb
+      .select('l.apiSlug', 'apiSlug')
+      .addSelect('l.publicPath', 'publicPath')
+      .addSelect('l.method', 'method')
+      .addSelect('COUNT(*)', 'total')
+      .addSelect(
+        'SUM(CASE WHEN l.statusCode >= 200 AND l.statusCode < 300 THEN 1 ELSE 0 END)',
+        'success',
+      )
+      .addSelect(
+        'SUM(CASE WHEN l.statusCode IS NULL OR l.statusCode < 200 OR l.statusCode >= 300 THEN 1 ELSE 0 END)',
+        'error',
+      )
+      .addSelect('AVG(l.durationMs)', 'avg')
+      .addSelect('PERCENTILE_CONT(0.95) WITHIN GROUP (ORDER BY l.durationMs)', 'p95')
+      .where('l.apiSlug IS NOT NULL')
+      .andWhere('l.publicPath IS NOT NULL')
+      .groupBy('l.apiSlug')
+      .addGroupBy('l.publicPath')
+      .addGroupBy('l.method')
+      .orderBy('total', 'DESC')
+      .limit(limit)
+      .getRawMany<{
+        apiSlug: string;
+        publicPath: string;
+        method: string;
+        total: string;
+        success: string;
+        error: string;
+        avg: string | null;
+        p95: string | null;
+      }>();
+
+    return rows.map((r) => ({
+      apiSlug: String(r.apiSlug),
+      publicPath: String(r.publicPath),
+      method: String(r.method),
+      total: Number(r.total ?? 0),
+      success: Number(r.success ?? 0),
+      error: Number(r.error ?? 0),
+      avgLatencyMs: r.avg === null ? null : Math.round(Number(r.avg)),
+      p95LatencyMs: r.p95 === null ? null : Math.round(Number(r.p95)),
+    }));
+  }
+
+  async heatmap(params?: {
+    apiSlug?: string;
+    publicPath?: string;
+    from?: Date;
+    to?: Date;
+    timezone?: string;
+  }) {
+    const tzRaw = String(params?.timezone ?? 'UTC').trim();
+    const tz = /^[A-Za-z0-9_/+-]{1,64}$/.test(tzRaw) ? tzRaw : 'UTC';
+
+    const qb = this.logRepo.createQueryBuilder('l');
+    if (params?.from) qb.andWhere('l.createdAt >= :from', { from: params.from });
+    if (params?.to) qb.andWhere('l.createdAt <= :to', { to: params.to });
+    if (params?.apiSlug) qb.andWhere('l.apiSlug = :apiSlug', { apiSlug: params.apiSlug });
+    if (params?.publicPath) qb.andWhere('l.publicPath = :publicPath', { publicPath: params.publicPath });
+
+    const rows = await qb
+      .select("EXTRACT(DOW FROM (l.createdAt AT TIME ZONE :tz))::int", 'dow')
+      .addSelect("EXTRACT(HOUR FROM (l.createdAt AT TIME ZONE :tz))::int", 'hour')
+      .addSelect('COUNT(*)', 'total')
+      .addSelect(
+        'SUM(CASE WHEN l.statusCode IS NULL OR l.statusCode < 200 OR l.statusCode >= 300 THEN 1 ELSE 0 END)',
+        'errors',
+      )
+      .where('l.createdAt IS NOT NULL')
+      .setParameter('tz', tz)
+      .groupBy('dow')
+      .addGroupBy('hour')
+      .orderBy('dow', 'ASC')
+      .addOrderBy('hour', 'ASC')
+      .getRawMany<{ dow: number; hour: number; total: string; errors: string }>();
+
+    return rows.map((r) => ({
+      dow: Number(r.dow),
+      hour: Number(r.hour),
+      total: Number(r.total ?? 0),
+      errors: Number(r.errors ?? 0),
+    }));
+  }
+
   async meta(params?: {
     apiSlug?: string;
     publicPath?: string;
+    statusCode?: number;
+    status?: string;
     from?: Date;
     to?: Date;
   }) {
@@ -228,6 +340,12 @@ export class LoggingService {
     if (params?.to) base.andWhere('l.createdAt <= :to', { to: params.to });
     if (params?.apiSlug) base.andWhere('l.apiSlug = :apiSlug', { apiSlug: params.apiSlug });
     if (params?.publicPath) base.andWhere('l.publicPath = :publicPath', { publicPath: params.publicPath });
+    if (params?.statusCode) base.andWhere('l.statusCode = :statusCode', { statusCode: params.statusCode });
+    if (params?.status) {
+      const s = String(params.status).toLowerCase();
+      if (s === 'success') base.andWhere('l.statusCode >= 200 AND l.statusCode < 300');
+      if (s === 'error') base.andWhere('(l.statusCode IS NULL OR l.statusCode < 200 OR l.statusCode >= 300)');
+    }
 
     const apiSlugs = await base
       .clone()
@@ -373,34 +491,51 @@ export class LoggingService {
   }
 
   async metrics() {
-    const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    return this.metricsFiltered();
+  }
 
-    const total = await this.logRepo
-      .createQueryBuilder('l')
-      .where('l.createdAt >= :since', { since })
+  async metricsFiltered(params?: {
+    apiSlug?: string;
+    publicPath?: string;
+    statusCode?: number;
+    status?: string;
+    from?: Date;
+    to?: Date;
+  }) {
+    const now = Date.now();
+    const from = params?.from ?? new Date(now - 24 * 60 * 60 * 1000);
+    const to = params?.to ?? new Date(now);
+
+    const base = this.logRepo.createQueryBuilder('l');
+    base.where('l.createdAt >= :from', { from });
+    base.andWhere('l.createdAt <= :to', { to });
+    if (params?.apiSlug) base.andWhere('l.apiSlug = :apiSlug', { apiSlug: params.apiSlug });
+    if (params?.publicPath) base.andWhere('l.publicPath = :publicPath', { publicPath: params.publicPath });
+    if (params?.statusCode) base.andWhere('l.statusCode = :statusCode', { statusCode: params.statusCode });
+    if (params?.status) {
+      const s = String(params.status).toLowerCase();
+      if (s === 'success') base.andWhere('l.statusCode >= 200 AND l.statusCode < 300');
+      if (s === 'error') base.andWhere('(l.statusCode IS NULL OR l.statusCode < 200 OR l.statusCode >= 300)');
+    }
+
+    const total = await base.clone().getCount();
+
+    const errors = await base
+      .clone()
+      .andWhere('(l.statusCode IS NULL OR l.statusCode < 200 OR l.statusCode >= 300)')
       .getCount();
 
-    const errors = await this.logRepo
-      .createQueryBuilder('l')
-      .where('l.createdAt >= :since', { since })
-      .andWhere(
-        '(l.statusCode IS NULL OR l.statusCode < 200 OR l.statusCode >= 300)',
-      )
-      .getCount();
-
-    const latencyRow = await this.logRepo
-      .createQueryBuilder('l')
+    const latencyRow = await base
+      .clone()
       .select('AVG(l.durationMs)', 'avg')
       .addSelect('PERCENTILE_CONT(0.95) WITHIN GROUP (ORDER BY l.durationMs)', 'p95')
-      .where('l.createdAt >= :since', { since })
       .andWhere('l.durationMs IS NOT NULL')
       .getRawOne<{ avg: string | null; p95: string | null }>();
 
-    const topApis = await this.logRepo
-      .createQueryBuilder('l')
+    const topApis = await base
+      .clone()
       .select('l.apiSlug', 'apiSlug')
       .addSelect('COUNT(*)', 'requests')
-      .where('l.createdAt >= :since', { since })
       .andWhere('l.apiSlug IS NOT NULL')
       .groupBy('l.apiSlug')
       .orderBy('requests', 'DESC')
@@ -408,7 +543,7 @@ export class LoggingService {
       .getRawMany<{ apiSlug: string; requests: string }>();
 
     return {
-      windowHours: 24,
+      windowHours: Math.max(0, Math.round(((to.getTime() - from.getTime()) / (60 * 60 * 1000)) * 10) / 10),
       totalRequests: total,
       errorRequests: errors,
       avgLatencyMs: latencyRow?.avg ? Math.round(Number(latencyRow.avg)) : null,

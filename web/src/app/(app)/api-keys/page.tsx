@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { DataTable } from '@/components/data-table';
+import { useI18n } from '@/components/i18n-provider';
 import { ConfirmModal, Modal } from '@/components/modal';
 import { Badge, Button, Card, CardBody, CardHeader, PageShell, TextInput, useToast } from '@/components/ui';
 import { apiFetch } from '@/lib/api';
@@ -54,6 +55,7 @@ function errorMessage(e: unknown) {
 const API_KEY_RE = /^[A-Za-z0-9._~-]{1,120}$/;
 
 export default function ApiKeysPage() {
+  const { t } = useI18n();
   const qc = useQueryClient();
   const toast = useToast();
   const [focus, setFocus] = useState('');
@@ -138,11 +140,11 @@ export default function ApiKeysPage() {
   const save = useMutation({
     mutationFn: async () => {
       const normalizedKey = key.trim();
-      if (!normalizedKey) throw new Error('Key é obrigatória.');
+      if (!normalizedKey) throw new Error('Chave é obrigatória.');
       if (!API_KEY_RE.test(normalizedKey)) {
-        throw new Error('Key inválida. Use apenas letras, números e . _ - ~ (sem espaços).');
+        throw new Error('Chave inválida. Use apenas letras, números e . _ - ~ (sem espaços).');
       }
-      if (!name.trim()) throw new Error('Name é obrigatório.');
+      if (!name.trim()) throw new Error('Nome é obrigatório.');
 
       const payload = {
         name: name.trim(),
@@ -201,36 +203,36 @@ export default function ApiKeysPage() {
   return (
     <PageShell
       title="Autenticação do Cliente"
-      subtitle="Multi-tenant context: cada API Key define bindings de variáveis e rate limit."
+      subtitle="Contexto multi-tenant: cada API Key define bindings de variáveis e rate limit."
       right={<Button onClick={beginCreate}>Criar Autenticação do Cliente</Button>}
     >
       <Card>
-        <CardHeader title="Autenticação do Cliente" description="Chaves ficam mascaradas na UI." right={<div className="text-xs text-white/55">{q.isPending ? 'Carregando…' : `${rows.length} itens`}</div>} />
+        <CardHeader title="Autenticação do Cliente" description="Chaves ficam mascaradas na UI." right={<div className="text-xs text-white/55">{q.isPending ? t('common.loading') : t('common.items', { n: rows.length })}</div>} />
         <CardBody>
           <DataTable<ApiKey>
             rows={rows}
             keyField={(r) => r.id}
             columns={[
-              { key: 'name', header: 'Name', render: (r) => <div className="font-medium text-white/90">{r.name}</div>, sortValue: (r) => r.name, filterValue: (r) => r.name },
-              { key: 'key', header: 'Key', render: (r) => <div className="font-mono text-xs text-white/70">{maskKey(r.key)}</div>, sortValue: (r) => r.key, filterValue: (r) => r.key },
-              { key: 'status', header: 'Status', render: (r) => (r.status === 'ACTIVE' ? <Badge tone="success">ACTIVE</Badge> : <Badge tone="danger">DISABLED</Badge>), sortValue: (r) => r.status, filterValue: (r) => r.status },
+              { key: 'name', header: t('common.name'), render: (r) => <div className="font-medium text-white/90">{r.name}</div>, sortValue: (r) => r.name, filterValue: (r) => r.name },
+              { key: 'key', header: t('common.key'), render: (r) => <div className="font-mono text-xs text-white/70">{maskKey(r.key)}</div>, sortValue: (r) => r.key, filterValue: (r) => r.key },
+              { key: 'status', header: t('common.statusLabel'), render: (r) => (r.status === 'ACTIVE' ? <Badge tone="success">{t('apiKeys.status.active')}</Badge> : <Badge tone="danger">{t('apiKeys.status.disabled')}</Badge>), sortValue: (r) => r.status, filterValue: (r) => r.status },
               { key: 'rpm', header: 'RPM', render: (r) => <div className="text-white/70">{r.requestsPerMinute}</div>, sortValue: (r) => r.requestsPerMinute, filterValue: (r) => String(r.requestsPerMinute) },
               {
                 key: 'actions',
-                header: 'Actions',
+                header: t('common.actions'),
                 render: (r) => (
                   <div className="flex items-center gap-2">
                     <Button variant="secondary" size="sm" onClick={() => beginEdit(r)}>
-                      Edit
+                      {t('common.edit')}
                     </Button>
                     <Button variant="danger" size="sm" onClick={() => askDelete(r)} disabled={del.isPending}>
-                      Delete
+                      {t('common.delete')}
                     </Button>
                   </div>
                 ),
               },
             ]}
-            empty="Sem API Keys ainda."
+            empty={t('apiKeys.empty')}
           />
         </CardBody>
       </Card>
@@ -238,27 +240,27 @@ export default function ApiKeysPage() {
       <Modal
         open={open}
         onClose={() => setOpen(false)}
-        title={editing ? 'Editar Autenticação do Cliente' : 'Criar Autenticação do Cliente'}
+        title={editing ? t('apiKeys.modal.editTitle') : t('apiKeys.modal.createTitle')}
         footer={
           <div className="flex items-center justify-end gap-2">
             <Button variant="secondary" onClick={() => setOpen(false)}>
-              Cancel
+              {t('common.cancel')}
             </Button>
             <Button onClick={() => save.mutate()} disabled={save.isPending}>
-              Save
+              {t('common.save')}
             </Button>
           </div>
         }
       >
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
-            <div className="text-xs font-medium text-white/70">Name</div>
+            <div className="text-xs font-medium text-white/70">{t('common.name')}</div>
             <div className="mt-2">
               <TextInput value={name} onChange={setName} placeholder="Ex: Cliente A" />
             </div>
           </div>
           <div>
-            <div className="text-xs font-medium text-white/70">Key</div>
+            <div className="text-xs font-medium text-white/70">{t('common.key')}</div>
             <div className="mt-2">
               <TextInput value={key} onChange={setKey} placeholder="abcdef" />
             </div>
@@ -268,20 +270,20 @@ export default function ApiKeysPage() {
           </div>
 
           <div>
-            <div className="text-xs font-medium text-white/70">Status</div>
+            <div className="text-xs font-medium text-white/70">{t('common.statusLabel')}</div>
             <div className="mt-2">
               <select
                 value={status}
                 onChange={(e) => setStatus(e.target.value as ApiKey['status'])}
                 className="h-10 w-full rounded-xl border border-white/10 bg-white/5 px-3 text-sm text-[color:var(--foreground)] focus:border-white/20 focus:ring-2 focus:ring-[color:var(--accent)]/30"
               >
-                <option value="ACTIVE">ACTIVE</option>
-                <option value="DISABLED">DISABLED</option>
+                <option value="ACTIVE">{t('apiKeys.status.active')}</option>
+                <option value="DISABLED">{t('apiKeys.status.disabled')}</option>
               </select>
             </div>
           </div>
           <div>
-            <div className="text-xs font-medium text-white/70">Requests/min</div>
+            <div className="text-xs font-medium text-white/70">Requisições/min</div>
             <div className="mt-2">
               <TextInput value={rpm} onChange={setRpm} type="number" placeholder="60" />
             </div>
@@ -290,7 +292,7 @@ export default function ApiKeysPage() {
 
         <div className="mt-5 grid gap-4 lg:grid-cols-2">
           <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-            <div className="text-xs font-medium text-white/70">Allowed APIs</div>
+            <div className="text-xs font-medium text-white/70">APIs permitidas</div>
             <div className="mt-2 text-xs text-white/55">
               Selecione quais APIs este API Key pode chamar. Se não selecionar nenhuma, ele pode chamar todas.
             </div>

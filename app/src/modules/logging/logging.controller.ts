@@ -11,14 +11,20 @@ export class LoggingController {
   meta(
     @Query('api') apiSlug?: string,
     @Query('path') publicPath?: string,
+    @Query('status') status?: string,
     @Query('from') from?: string,
     @Query('to') to?: string,
   ) {
     const fromDate = from ? new Date(from) : undefined;
     const toDate = to ? new Date(to) : undefined;
+    const statusRaw = String(status ?? '').trim();
+    const statusNum = statusRaw && /^\d+$/.test(statusRaw) ? Number(statusRaw) : null;
+    const statusClass = statusNum === null && statusRaw ? statusRaw.toLowerCase() : undefined;
     return this.logs.meta({
       apiSlug,
       publicPath,
+      statusCode: statusNum === null ? undefined : statusNum,
+      status: statusClass,
       from: fromDate && !Number.isNaN(fromDate.getTime()) ? fromDate : undefined,
       to: toDate && !Number.isNaN(toDate.getTime()) ? toDate : undefined,
     });
@@ -128,6 +134,52 @@ export class LoggingController {
     res.setHeader('content-type', 'application/json; charset=utf-8');
     res.setHeader('content-disposition', 'attachment; filename="openroutex-logs.json"');
     return list;
+  }
+
+  @Get('endpoints')
+  endpoints(
+    @Query('api') apiSlug?: string,
+    @Query('path') publicPath?: string,
+    @Query('method') method?: string,
+    @Query('status') status?: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+    @Query('limit') limit?: string,
+  ) {
+    const fromDate = from ? new Date(from) : undefined;
+    const toDate = to ? new Date(to) : undefined;
+    const statusRaw = String(status ?? '').trim();
+    const statusNum = statusRaw && /^\d+$/.test(statusRaw) ? Number(statusRaw) : null;
+    const statusClass = statusNum === null && statusRaw ? statusRaw.toLowerCase() : undefined;
+    return this.logs.endpointReport({
+      apiSlug,
+      publicPath,
+      method,
+      statusCode: statusNum === null ? undefined : statusNum,
+      status: statusClass,
+      from: fromDate && !Number.isNaN(fromDate.getTime()) ? fromDate : undefined,
+      to: toDate && !Number.isNaN(toDate.getTime()) ? toDate : undefined,
+      limit: limit ? Number(limit) : undefined,
+    });
+  }
+
+  @Get('heatmap')
+  heatmap(
+    @Query('api') apiSlug?: string,
+    @Query('path') publicPath?: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+    @Query('tz') tz?: string,
+  ) {
+    const fromDate = from ? new Date(from) : undefined;
+    const toDate = to ? new Date(to) : undefined;
+    return this.logs.heatmap({
+      apiSlug,
+      publicPath,
+      timezone: tz,
+      from: fromDate && !Number.isNaN(fromDate.getTime()) ? fromDate : undefined,
+      to: toDate && !Number.isNaN(toDate.getTime()) ? toDate : undefined,
+    });
   }
 
   @Get(':id')

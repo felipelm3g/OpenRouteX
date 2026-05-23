@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { DataTable } from '@/components/data-table';
+import { useI18n } from '@/components/i18n-provider';
 import { ConfirmModal, Modal } from '@/components/modal';
 import { Badge, Button, Card, CardBody, CardHeader, PageShell, Select, TextInput, useToast } from '@/components/ui';
 import { apiFetch } from '@/lib/api';
@@ -26,15 +27,15 @@ type Auth = {
   createdAt: string;
 };
 
-function typeLabel(t: AuthType) {
-  if (t === 'oauth2_client_credentials') return 'OAuth2 Client Credentials';
-  if (t === 'oidc_client_credentials') return 'OIDC Client Credentials';
-  if (t === 'oauth1') return 'OAuth 1.0a';
-  if (t === 'hmac') return 'HMAC Signature';
-  if (t === 'custom_header') return 'Custom Header';
-  if (t === 'api_key') return 'API Key';
-  if (t === 'bearer') return 'Bearer';
-  return 'Basic';
+function typeLabel(type: AuthType, t: (key: string) => string) {
+  if (type === 'oauth2_client_credentials') return t('authentication.type.oauth2ClientCredentials');
+  if (type === 'oidc_client_credentials') return t('authentication.type.oidcClientCredentials');
+  if (type === 'oauth1') return t('authentication.type.oauth1');
+  if (type === 'hmac') return t('authentication.type.hmac');
+  if (type === 'custom_header') return t('authentication.type.customHeader');
+  if (type === 'api_key') return t('authentication.type.apiKey');
+  if (type === 'bearer') return t('authentication.type.bearer');
+  return t('authentication.type.basic');
 }
 
 function defaultConfig(t: AuthType): Record<string, unknown> {
@@ -92,6 +93,7 @@ function errorMessage(e: unknown) {
 }
 
 export default function AuthenticationPage() {
+  const { t } = useI18n();
   const qc = useQueryClient();
   const toast = useToast();
   const [focus, setFocus] = useState('');
@@ -196,7 +198,7 @@ export default function AuthenticationPage() {
       details: (
         <div className="grid gap-1 text-xs text-white/75">
           <div className="font-medium text-white/85">{a.name}</div>
-          <div className="text-white/55">{typeLabel(a.type)}</div>
+          <div className="text-white/55">{typeLabel(a.type, t)}</div>
         </div>
       ),
       onConfirm: () => {
@@ -204,20 +206,20 @@ export default function AuthenticationPage() {
         del.mutate(a.id);
       },
     });
-  }, [del]);
+  }, [del, t]);
 
   const rows = useMemo(() => q.data ?? [], [q.data]);
 
   return (
     <PageShell
-      title="Credenciais Upstream"
-      subtitle="Crie autenticações reutilizáveis para aplicar nos Paths (OAuth2/OIDC, Bearer, Basic, API Key, Custom Header, HMAC e OAuth1)."
-      right={<Button onClick={beginCreate}>Criar Credencial</Button>}
+      title={t('authentication.title')}
+      subtitle={t('authentication.subtitle')}
+      right={<Button onClick={beginCreate}>{t('authentication.create')}</Button>}
     >
       <Card>
-        <CardHeader title="Auths" description="Reutilizáveis entre APIs e Paths." right={
+        <CardHeader title={t('authentication.table.title')} description={t('authentication.table.description')} right={
           <div className="text-xs text-white/55">
-            {q.isPending ? 'Carregando…' : `${rows.length} itens`}
+            {q.isPending ? t('common.loading') : t('common.items', { n: rows.length })}
           </div>
         } />
         <CardBody>
@@ -227,25 +229,25 @@ export default function AuthenticationPage() {
             columns={[
               {
                 key: 'name',
-                header: 'Name',
+                header: t('common.name'),
                 render: (r) => <div className="font-medium text-white/90">{r.name}</div>,
                 sortValue: (r) => r.name,
                 filterValue: (r) => r.name,
               },
               {
                 key: 'type',
-                header: 'Type',
-                render: (r) => <Badge tone="neutral">{typeLabel(r.type)}</Badge>,
-                sortValue: (r) => typeLabel(r.type),
-                filterValue: (r) => typeLabel(r.type),
+                header: t('common.type'),
+                render: (r) => <Badge tone="neutral">{typeLabel(r.type, t)}</Badge>,
+                sortValue: (r) => typeLabel(r.type, t),
+                filterValue: (r) => typeLabel(r.type, t),
               },
               {
                 key: 'id',
-                header: 'Actions',
+                header: t('common.actions'),
                 render: (r) => (
                   <div className="flex items-center gap-2">
                     <Button variant="secondary" size="sm" onClick={() => beginEdit(r)}>
-                      Edit
+                      {t('common.edit')}
                     </Button>
                     <Button
                       variant="danger"
@@ -253,13 +255,13 @@ export default function AuthenticationPage() {
                       onClick={() => askDelete(r)}
                       disabled={del.isPending}
                     >
-                      Delete
+                      {t('common.delete')}
                     </Button>
                   </div>
                 ),
               },
             ]}
-            empty="Sem autenticações ainda."
+            empty={t('authentication.empty')}
           />
         </CardBody>
       </Card>
@@ -267,27 +269,27 @@ export default function AuthenticationPage() {
       <Modal
         open={open}
         onClose={() => setOpen(false)}
-        title={editing ? 'Editar Credencial' : 'Criar Credencial'}
+        title={editing ? t('authentication.modal.editTitle') : t('authentication.modal.createTitle')}
         footer={
           <div className="flex items-center justify-end gap-2">
             <Button variant="secondary" onClick={() => setOpen(false)}>
-              Cancel
+              {t('common.cancel')}
             </Button>
             <Button onClick={() => save.mutate()} disabled={save.isPending}>
-              Save
+              {t('common.save')}
             </Button>
           </div>
         }
       >
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="sm:col-span-2">
-            <div className="text-xs font-medium text-white/70">Name</div>
+            <div className="text-xs font-medium text-white/70">{t('common.name')}</div>
             <div className="mt-2">
               <TextInput value={name} onChange={setName} placeholder="Ex: UberEats OAuth" />
             </div>
           </div>
           <div className="sm:col-span-2">
-            <div className="text-xs font-medium text-white/70">Type</div>
+            <div className="text-xs font-medium text-white/70">{t('common.type')}</div>
             <div className="mt-2">
               <Select
                 value={type}
@@ -299,12 +301,12 @@ export default function AuthenticationPage() {
                 options={[
                   { value: 'bearer', label: 'Bearer' },
                   { value: 'basic', label: 'Basic' },
-                  { value: 'api_key', label: 'API Key (header)' },
-                  { value: 'custom_header', label: 'Custom Header' },
-                  { value: 'oauth2_client_credentials', label: 'OAuth2 Client Credentials' },
-                  { value: 'oidc_client_credentials', label: 'OIDC Client Credentials' },
-                  { value: 'hmac', label: 'HMAC Signature' },
-                  { value: 'oauth1', label: 'OAuth 1.0a' },
+                  { value: 'api_key', label: t('authentication.type.apiKey') },
+                  { value: 'custom_header', label: t('authentication.type.customHeader') },
+                  { value: 'oauth2_client_credentials', label: t('authentication.type.oauth2ClientCredentials') },
+                  { value: 'oidc_client_credentials', label: t('authentication.type.oidcClientCredentials') },
+                  { value: 'hmac', label: t('authentication.type.hmac') },
+                  { value: 'oauth1', label: t('authentication.type.oauth1') },
                 ]}
               />
             </div>
@@ -312,7 +314,7 @@ export default function AuthenticationPage() {
         </div>
 
         <div className="mt-5 rounded-2xl border border-white/10 bg-white/5 p-4">
-          <div className="text-xs font-medium text-white/70">Config</div>
+          <div className="text-xs font-medium text-white/70">{t('authentication.form.config')}</div>
           <div className="mt-3 grid gap-3 sm:grid-cols-2">
             {type === 'bearer' ? (
               <>

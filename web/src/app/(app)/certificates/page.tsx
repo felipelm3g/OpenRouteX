@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useMemo, useState } from 'react';
 
 import { DataTable } from '@/components/data-table';
+import { useI18n } from '@/components/i18n-provider';
 import { ConfirmModal, Modal } from '@/components/modal';
 import { Badge, Button, Card, CardBody, CardHeader, PageShell, Select, TextInput, useToast } from '@/components/ui';
 import { apiFetch } from '@/lib/api';
@@ -46,6 +47,7 @@ function fmtDate(dt: string | null) {
 }
 
 export default function CertificatesPage() {
+  const { t } = useI18n();
   const qc = useQueryClient();
   const toast = useToast();
 
@@ -199,7 +201,7 @@ export default function CertificatesPage() {
         <CardHeader
           title="Certificados"
           description="Mostra formato e validade."
-          right={<div className="text-xs text-white/55">{q.isPending ? 'Carregando…' : `${rows.length} itens`}</div>}
+          right={<div className="text-xs text-white/55">{q.isPending ? t('common.loading') : t('common.items', { n: rows.length })}</div>}
         />
         <CardBody>
           <DataTable<Certificate>
@@ -211,14 +213,14 @@ export default function CertificatesPage() {
               { key: 'notAfter', header: 'Validade', render: (r) => <div className="text-white/80">{fmtDate(r.notAfter)}</div>, sortValue: (r) => r.notAfter ?? '', filterValue: (r) => r.notAfter ?? '' },
               {
                 key: 'actions',
-                header: 'Actions',
+                header: t('common.actions'),
                 render: (r) => (
                   <div className="flex items-center gap-2">
                     <Button variant="secondary" size="sm" onClick={() => beginEdit(r)}>
-                      Edit
+                      {t('common.edit')}
                     </Button>
                     <Button variant="danger" size="sm" onClick={() => askDelete(r)} disabled={del.isPending}>
-                      Delete
+                      {t('common.delete')}
                     </Button>
                   </div>
                 ),
@@ -233,15 +235,15 @@ export default function CertificatesPage() {
                 <div className="text-xs text-white/60">Validade: {fmtDate(r.notAfter)}</div>
                 <div className="mt-2 flex items-center gap-2">
                   <Button variant="secondary" size="sm" onClick={() => beginEdit(r)}>
-                    Edit
+                    {t('common.edit')}
                   </Button>
                   <Button variant="danger" size="sm" onClick={() => askDelete(r)} disabled={del.isPending}>
-                    Delete
+                    {t('common.delete')}
                   </Button>
                 </div>
               </div>
             )}
-            empty="Sem certificados ainda."
+            empty={t('certificates.empty')}
           />
         </CardBody>
       </Card>
@@ -249,14 +251,14 @@ export default function CertificatesPage() {
       <Modal
         open={open}
         onClose={() => setOpen(false)}
-        title={editing ? 'Editar Certificado' : 'Enviar Certificado'}
+        title={editing ? t('certificates.modal.editTitle') : t('certificates.modal.createTitle')}
         footer={
           <div className="flex items-center justify-end gap-2">
             <Button variant="secondary" onClick={() => setOpen(false)}>
-              Cancel
+              {t('common.cancel')}
             </Button>
             <Button onClick={() => save.mutate()} disabled={save.isPending}>
-              Save
+              {t('common.save')}
             </Button>
           </div>
         }

@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react';
 
+import { useI18n } from './i18n-provider';
 import { Button, cn, TextInput } from './ui';
 
 export type Column<T> = {
@@ -38,6 +39,7 @@ export function DataTable<T>({
   filterPlaceholder?: string;
   initialSort?: { key: string; dir: SortDir };
 }) {
+  const { t } = useI18n();
   const [filter, setFilter] = useState('');
   const [sort, setSort] = useState<{ key: string; dir: SortDir } | null>(
     initialSort ?? null,
@@ -105,12 +107,12 @@ export function DataTable<T>({
               <TextInput value={filter} onChange={(v) => { setFilter(v); setPage(1); }} placeholder={filterPlaceholder} />
             </div>
             <div className="text-xs text-white/55">
-              0 itens
+              {t('common.items', { n: 0 })}
             </div>
           </div>
         ) : null}
         <div className="rounded-2xl border border-white/10 bg-white/5 p-8 text-sm text-white/65">
-          {empty ?? 'Sem dados.'}
+          {empty ?? t('common.noData')}
         </div>
       </div>
     );
@@ -137,7 +139,7 @@ export function DataTable<T>({
 
           <div className="flex items-center justify-between gap-2">
             <div className="text-xs text-white/55">
-              {sorted.length} itens
+              {t('common.items', { n: sorted.length })}
             </div>
             {enablePagination ? (
               <div className="flex items-center gap-2">
@@ -147,7 +149,7 @@ export function DataTable<T>({
                   onClick={() => setPage((p) => Math.max(1, p - 1))}
                   disabled={page <= 1}
                 >
-                  Prev
+                  {t('common.prev')}
                 </Button>
                 <div className="text-xs text-white/55">
                   {page} / {pagination.totalPages}
@@ -160,7 +162,7 @@ export function DataTable<T>({
                   }
                   disabled={page >= pagination.totalPages}
                 >
-                  Next
+                  {t('common.next')}
                 </Button>
               </div>
             ) : null}

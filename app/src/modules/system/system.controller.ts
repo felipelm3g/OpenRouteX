@@ -69,8 +69,26 @@ export class SystemController {
   }
 
   @Get('/admin/metrics')
-  metrics() {
-    return this.logs.metrics();
+  metrics(
+    @Query('api') apiSlug?: string,
+    @Query('path') publicPath?: string,
+    @Query('status') status?: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+  ) {
+    const fromDate = from ? new Date(from) : undefined;
+    const toDate = to ? new Date(to) : undefined;
+    const statusRaw = String(status ?? '').trim();
+    const statusNum = statusRaw && /^\d+$/.test(statusRaw) ? Number(statusRaw) : null;
+    const statusClass = statusNum === null && statusRaw ? statusRaw.toLowerCase() : undefined;
+    return this.logs.metricsFiltered({
+      apiSlug,
+      publicPath,
+      statusCode: statusNum === null ? undefined : statusNum,
+      status: statusClass,
+      from: fromDate && !Number.isNaN(fromDate.getTime()) ? fromDate : undefined,
+      to: toDate && !Number.isNaN(toDate.getTime()) ? toDate : undefined,
+    });
   }
 
   @Get('/admin/session')

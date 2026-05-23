@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useEffect, useMemo, useState } from 'react';
 
 import { DataTable } from '@/components/data-table';
+import { useI18n } from '@/components/i18n-provider';
 import { Modal } from '@/components/modal';
 import { Badge, Button, Card, CardBody, CardHeader, MethodBadge, PageShell, Select, Skeleton, TextInput, useToast } from '@/components/ui';
 import { apiFetch } from '@/lib/api';
@@ -47,6 +48,19 @@ type LogDetailDto = LogRow & {
   requestBody: string | null;
   responseBody: string | null;
 };
+
+type EndpointReportRow = {
+  apiSlug: string;
+  publicPath: string;
+  method: string;
+  total: number;
+  success: number;
+  error: number;
+  avgLatencyMs: number | null;
+  p95LatencyMs: number | null;
+};
+
+type HeatmapCell = { dow: number; hour: number; total: number; errors: number };
 
 type LogsMetaDto = {
   apiSlugs: Array<{ value: string; count: number }>;
@@ -141,6 +155,7 @@ function zonedDateTimeLocalToUtcIso(local: string, timeZone: string) {
 }
 
 export default function DashboardPage() {
+  const { t } = useI18n();
   const toast = useToast();
   const settingsQ = useQuery({
     queryKey: ['settings'],
@@ -178,26 +193,21 @@ export default function DashboardPage() {
     return () => clearTimeout(t);
   }, [api]);
 
-  const q = useQuery({
-    queryKey: ['metrics'],
-    queryFn: () => apiFetch<Metrics>('/admin/metrics'),
-    refetchInterval: metricsRefetch,
-  });
-
   const metaApisQ = useQuery({
-    queryKey: ['logs-meta-apis', from, to, tz],
+    queryKey: ['logs-meta-apis', status, from, to, tz],
     queryFn: () => {
       const qs = new URLSearchParams();
       const fromIso = from ? zonedDateTimeLocalToUtcIso(from, tz) : null;
       const toIso = to ? zonedDateTimeLocalToUtcIso(to, tz) : null;
       if (fromIso) qs.set('from', fromIso);
       if (toIso) qs.set('to', toIso);
+      if (status) qs.set('status', status);
       return apiFetch<LogsMetaDto>(`/admin/logs/meta?${qs.toString()}`);
     },
   });
 
   const metaPathsQ = useQuery({
-    queryKey: ['logs-meta-paths', api, from, to, tz],
+    queryKey: ['logs-meta-paths', api, status, from, to, tz],
     enabled: Boolean(api),
     queryFn: () => {
       const qs = new URLSearchParams();
@@ -206,22 +216,41 @@ export default function DashboardPage() {
       const toIso = to ? zonedDateTimeLocalToUtcIso(to, tz) : null;
       if (fromIso) qs.set('from', fromIso);
       if (toIso) qs.set('to', toIso);
+      if (status) qs.set('status', status);
       return apiFetch<LogsMetaDto>(`/admin/logs/meta?${qs.toString()}`);
     },
   });
 
   const metaStatusQ = useQuery({
-    queryKey: ['logs-meta-status', api, path, from, to, tz],
+    queryKey: ['logs-meta-status', api, path, status, from, to, tz],
     queryFn: () => {
       const qs = new URLSearchParams();
       if (api) qs.set('api', api);
       if (path) qs.set('path', path);
+      if (status) qs.set('status', status);
       const fromIso = from ? zonedDateTimeLocalToUtcIso(from, tz) : null;
       const toIso = to ? zonedDateTimeLocalToUtcIso(to, tz) : null;
       if (fromIso) qs.set('from', fromIso);
       if (toIso) qs.set('to', toIso);
       return apiFetch<LogsMetaDto>(`/admin/logs/meta?${qs.toString()}`);
     },
+  });
+
+  const metricsQ = useQuery({
+    queryKey: ['metrics', api, path, status, from, to, tz],
+    queryFn: () => {
+      const qs = new URLSearchParams();
+      if (api) qs.set('api', api);
+      if (path) qs.set('path', path);
+      if (status) qs.set('status', status);
+      const fromIso = from ? zonedDateTimeLocalToUtcIso(from, tz) : null;
+      const toIso = to ? zonedDateTimeLocalToUtcIso(to, tz) : null;
+      if (fromIso) qs.set('from', fromIso);
+      if (toIso) qs.set('to', toIso);
+      const suffix = qs.toString();
+      return apiFetch<Metrics>(`/admin/metrics${suffix ? `?${suffix}` : ''}`);
+    },
+    refetchInterval: metricsRefetch,
   });
 
   const listQ = useQuery({
@@ -241,14 +270,45 @@ export default function DashboardPage() {
     refetchInterval: logsRefetch,
   });
 
+  const endpointQ = useQuery({
+    queryKey: ['dashboard-endpoints', api, path, status, from, to, tz],
+    queryFn: () => {
+      const qs = new URLSearchParams();
+      if (api) qs.set('api', api);
+      if (path) qs.set('path', path);
+      if (status) qs.set('status', status);
+      const fromIso = from ? zonedDateTimeLocalToUtcIso(from, tz) : null;
+      const toIso = to ? zonedDateTimeLocalToUtcIso(to, tz) : null;
+      if (fromIso) qs.set('from', fromIso);
+      if (toIso) qs.set('to', toIso);
+      qs.set('limit', '200');
+      return apiFetch<EndpointReportRow[]>(`/admin/logs/endpoints?${qs.toString()}`);
+    },
+  });
+
+  const heatmapQ = useQuery({
+    queryKey: ['dashboard-heatmap', api, path, from, to, tz],
+    queryFn: () => {
+      const qs = new URLSearchParams();
+      if (api) qs.set('api', api);
+      if (path) qs.set('path', path);
+      const fromIso = from ? zonedDateTimeLocalToUtcIso(from, tz) : null;
+      const toIso = to ? zonedDateTimeLocalToUtcIso(to, tz) : null;
+      if (fromIso) qs.set('from', fromIso);
+      if (toIso) qs.set('to', toIso);
+      qs.set('tz', tz);
+      return apiFetch<HeatmapCell[]>(`/admin/logs/heatmap?${qs.toString()}`);
+    },
+  });
+
   const detailQ = useQuery({
     queryKey: ['log', openId],
     queryFn: () => apiFetch<LogDetailDto | null>(`/admin/logs/${openId}`),
     enabled: Boolean(openId),
   });
 
-  const m = q.data;
-  const loading = q.isPending;
+  const m = metricsQ.data;
+  const loading = metricsQ.isPending;
   const rows = useMemo(() => listQ.data ?? [], [listQ.data]);
   const detail = detailQ.data;
 
@@ -346,7 +406,7 @@ export default function DashboardPage() {
     a.click();
     a.remove();
     URL.revokeObjectURL(u);
-    toast.info('Download', `openroutex-logs.${format}`);
+    toast.info(t('dashboard.toast.download.title'), `openroutex-logs.${format}`);
   };
 
   return (
@@ -354,9 +414,38 @@ export default function DashboardPage() {
       title="Dashboard"
       subtitle="Métricas de uso e status operacional (janela de 24h)."
     >
+      <Card className="mt-4">
+        <CardHeader
+          title={t('dashboard.filters.title')}
+          description={t('dashboard.filters.description')}
+          right={
+            <div className="flex items-center gap-2">
+              <Button variant="secondary" size="sm" onClick={() => void downloadLogs('csv')}>
+                {t('common.exportCsv')}
+              </Button>
+              <Button variant="secondary" size="sm" onClick={() => void downloadLogs('json')}>
+                {t('common.exportJson')}
+              </Button>
+              <div className="text-xs text-white/55">
+                {listQ.isPending ? 'Carregando…' : `Atualiza a cada ${Math.max(1, Math.round(logsRefetch / 1000))}s`}
+              </div>
+            </div>
+          }
+        />
+        <CardBody>
+          <div className="grid gap-3 lg:grid-cols-5">
+            <Select value={api} onChange={setApi} options={apiOptions} />
+            <Select value={path} onChange={setPath} options={pathOptions} />
+            <Select value={status} onChange={setStatus} options={statusOptions} />
+            <TextInput value={from} onChange={setFrom} placeholder={t('common.from')} type="datetime-local" />
+            <TextInput value={to} onChange={setTo} placeholder={t('common.to')} type="datetime-local" />
+          </div>
+        </CardBody>
+      </Card>
+
       <div className="grid gap-4 lg:grid-cols-4">
         <Card className="lg:col-span-1">
-          <CardHeader title="Requests" description="Total (24h)" />
+          <CardHeader title={t('dashboard.cards.requests.title')} description={t('dashboard.cards.requests.description')} />
           <CardBody>
             {loading ? (
               <Skeleton className="h-8 w-28" />
@@ -365,11 +454,11 @@ export default function DashboardPage() {
                 {(m?.totalRequests ?? 0).toLocaleString('pt-BR')}
               </div>
             )}
-            <div className="mt-2 text-sm text-white/55">Inclui todas as rotas.</div>
+            <div className="mt-2 text-sm text-white/55">{t('dashboard.cards.requests.note')}</div>
           </CardBody>
         </Card>
         <Card className="lg:col-span-1">
-          <CardHeader title="Errors" description="Status != 2xx" />
+          <CardHeader title={t('dashboard.cards.errors.title')} description={t('dashboard.cards.errors.description')} />
           <CardBody>
             {loading ? (
               <Skeleton className="h-8 w-24" />
@@ -378,11 +467,11 @@ export default function DashboardPage() {
                 {(m?.errorRequests ?? 0).toLocaleString('pt-BR')}
               </div>
             )}
-            <div className="mt-2 text-sm text-white/55">Falhas e bloqueios.</div>
+            <div className="mt-2 text-sm text-white/55">{t('dashboard.cards.errors.note')}</div>
           </CardBody>
         </Card>
         <Card className="lg:col-span-1">
-          <CardHeader title="Latency" description="AVG (ms)" />
+          <CardHeader title={t('dashboard.cards.latencyAvg.title')} description={t('dashboard.cards.latencyAvg.description')} />
           <CardBody>
             {loading ? (
               <Skeleton className="h-8 w-20" />
@@ -391,11 +480,11 @@ export default function DashboardPage() {
                 {m?.avgLatencyMs ?? '—'}
               </div>
             )}
-            <div className="mt-2 text-sm text-white/55">Tempo até resposta.</div>
+            <div className="mt-2 text-sm text-white/55">{t('dashboard.cards.latencyAvg.note')}</div>
           </CardBody>
         </Card>
         <Card className="lg:col-span-1">
-          <CardHeader title="Latency" description="P95 (ms)" />
+          <CardHeader title={t('dashboard.cards.latencyP95.title')} description={t('dashboard.cards.latencyP95.description')} />
           <CardBody>
             {loading ? (
               <Skeleton className="h-8 w-20" />
@@ -404,7 +493,7 @@ export default function DashboardPage() {
                 {m?.p95LatencyMs ?? '—'}
               </div>
             )}
-            <div className="mt-2 text-sm text-white/55">Cauda de performance.</div>
+            <div className="mt-2 text-sm text-white/55">{t('dashboard.cards.latencyP95.note')}</div>
           </CardBody>
         </Card>
       </div>
@@ -412,8 +501,8 @@ export default function DashboardPage() {
       <div className="mt-4 grid gap-4 lg:grid-cols-3">
         <Card className="lg:col-span-2">
           <CardHeader
-            title="Top APIs"
-            description="Mais chamadas (24h)"
+            title={t('dashboard.topApis.title')}
+            description={t('dashboard.topApis.description')}
             right={
               <div className="text-xs text-white/55">
                 {loading ? 'Atualizando…' : `Atualiza a cada ${Math.max(1, Math.round(metricsRefetch / 1000))}s`}
@@ -451,27 +540,33 @@ export default function DashboardPage() {
         </Card>
 
         <Card className="lg:col-span-1">
-          <CardHeader title="Status" description="Distribuição (filtros atuais)" />
+          <CardHeader title={t('dashboard.status.title')} description={t('dashboard.status.description')} />
           <CardBody>
             {(metaStatusQ.data?.statuses ?? metaApisQ.data?.statuses ?? []).length ? (
               <div className="grid gap-3">
                 {(() => {
                   const items = (metaStatusQ.data?.statuses ?? metaApisQ.data?.statuses ?? []).slice(0, 8);
                   const max = Math.max(...items.map((x) => x.count), 1);
-                  return items.map((s) => (
-                    <div key={s.value} className="rounded-xl border border-white/10 bg-white/5 px-4 py-3">
-                      <div className="flex items-center justify-between gap-3">
-                        <Badge tone={toneForStatus(s.value)}>{s.value}</Badge>
-                        <div className="text-sm text-white/70">{s.count.toLocaleString('pt-BR')}</div>
-                      </div>
-                      <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-white/5">
-                        <div
-                          className="h-full rounded-full bg-[linear-gradient(90deg,var(--accent),var(--accent-2))]"
-                          style={{ width: `${Math.round((s.count / max) * 100)}%` }}
-                        />
-                      </div>
+                  return (
+                    <div className="flex items-end gap-3">
+                      {items.map((s) => {
+                        const pct = Math.round((s.count / max) * 100);
+                        const h = s.count > 0 ? Math.max(3, pct) : 0;
+                        return (
+                          <div key={s.value} className="flex flex-1 flex-col items-center gap-2">
+                            <div className="text-xs text-white/70">{s.count.toLocaleString('pt-BR')}</div>
+                            <div className="relative h-28 w-4 overflow-hidden rounded-full bg-white/5">
+                              <div
+                                className="absolute bottom-0 left-0 w-full rounded-full bg-[linear-gradient(180deg,var(--accent),var(--accent-2))]"
+                                style={{ height: `${h}%` }}
+                              />
+                            </div>
+                            <Badge tone={toneForStatus(s.value)}>{s.value}</Badge>
+                          </div>
+                        );
+                      })}
                     </div>
-                  ));
+                  );
                 })()}
               </div>
             ) : (
@@ -482,36 +577,7 @@ export default function DashboardPage() {
       </div>
 
       <Card className="mt-4">
-        <CardHeader
-          title="Filtros"
-          description="Filtre por slug, rota, status e janela de data/hora."
-          right={
-            <div className="flex items-center gap-2">
-              <Button variant="secondary" size="sm" onClick={() => void downloadLogs('csv')}>
-                Export CSV
-              </Button>
-              <Button variant="secondary" size="sm" onClick={() => void downloadLogs('json')}>
-                Export JSON
-              </Button>
-              <div className="text-xs text-white/55">
-                {listQ.isPending ? 'Carregando…' : `Atualiza a cada ${Math.max(1, Math.round(logsRefetch / 1000))}s`}
-              </div>
-            </div>
-          }
-        />
-        <CardBody>
-          <div className="grid gap-3 lg:grid-cols-5">
-            <Select value={api} onChange={setApi} options={apiOptions} />
-            <Select value={path} onChange={setPath} options={pathOptions} />
-            <Select value={status} onChange={setStatus} options={statusOptions} />
-            <TextInput value={from} onChange={setFrom} placeholder="From" type="datetime-local" />
-            <TextInput value={to} onChange={setTo} placeholder="To" type="datetime-local" />
-          </div>
-        </CardBody>
-      </Card>
-
-      <Card className="mt-4">
-        <CardHeader title="Execuções" description="Lista em tempo real (clique para ver detalhes)." />
+        <CardHeader title={t('dashboard.executions.title')} description={t('dashboard.executions.description')} />
         <CardBody>
           <DataTable<LogRow>
             rows={rows}
@@ -520,7 +586,7 @@ export default function DashboardPage() {
             columns={[
               {
                 key: 'm',
-                header: 'Method',
+                header: t('common.method'),
                 render: (r) => <MethodBadge method={r.method} />,
                 sortValue: (r) => r.method,
                 filterValue: (r) => r.method,
@@ -534,45 +600,45 @@ export default function DashboardPage() {
               },
               {
                 key: 'path',
-                header: 'Path',
+                header: t('common.path'),
                 render: (r) => <div className="text-white/80">{r.publicPath ?? '—'}</div>,
                 sortValue: (r) => r.publicPath ?? '',
                 filterValue: (r) => r.publicPath ?? '',
               },
               {
                 key: 'status',
-                header: 'Status',
+                header: t('common.statusLabel'),
                 render: (r) => <Badge tone={toneForStatus(r.statusCode)}>{r.statusCode ?? '—'}</Badge>,
                 sortValue: (r) => r.statusCode ?? 0,
                 filterValue: (r) => String(r.statusCode ?? ''),
               },
               {
                 key: 'lat',
-                header: 'Latency',
+                header: t('common.latency'),
                 render: (r) => <div className="text-white/70">{r.durationMs ?? '—'} ms</div>,
                 sortValue: (r) => r.durationMs ?? 0,
                 filterValue: (r) => String(r.durationMs ?? ''),
               },
               {
                 key: 'reqAt',
-                header: 'Request At',
+                header: t('common.requestAt'),
                 render: (r) => <div className="text-xs text-white/70">{formatDateTime(r.createdAt, tz)}</div>,
                 sortValue: (r) => r.createdAt,
                 filterValue: (r) => r.createdAt,
               },
               {
                 key: 'resAt',
-                header: 'Response At',
+                header: t('common.responseAt'),
                 render: (r) => <div className="text-xs text-white/70">{formatDateTime(r.responseAt, tz)}</div>,
                 sortValue: (r) => r.responseAt ?? '',
                 filterValue: (r) => r.responseAt ?? '',
               },
               {
                 key: 'act',
-                header: 'Actions',
+                header: t('common.actions'),
                 render: (r) => (
                   <Button variant="secondary" size="sm" onClick={() => setOpenId(r.id)}>
-                    View
+                    {t('common.view')}
                   </Button>
                 ),
               },
@@ -590,7 +656,7 @@ export default function DashboardPage() {
                   {formatDateTime(r.createdAt, tz)} • {r.durationMs ?? '—'} ms
                 </div>
                 <Button variant="secondary" size="sm" onClick={() => setOpenId(r.id)}>
-                  View
+                  {t('common.view')}
                 </Button>
               </div>
             )}
@@ -599,15 +665,188 @@ export default function DashboardPage() {
         </CardBody>
       </Card>
 
+      <Card className="mt-4">
+        <CardHeader
+          title={t('dashboard.endpointReport.title')}
+          description={t('dashboard.endpointReport.description')}
+          right={
+            <div className="text-xs text-white/55">
+              {endpointQ.isPending ? 'Carregando…' : `${(endpointQ.data ?? []).length} endpoints`}
+            </div>
+          }
+        />
+        <CardBody>
+          <DataTable<EndpointReportRow>
+            rows={endpointQ.data ?? []}
+            keyField={(r) => `${r.method}:${r.apiSlug}:${r.publicPath}`}
+            pageSize={15}
+            columns={[
+              {
+                key: 'm',
+                header: t('common.method'),
+                render: (r) => <MethodBadge method={r.method} />,
+                sortValue: (r) => r.method,
+                filterValue: (r) => r.method,
+              },
+              {
+                key: 'api',
+                header: 'Slug',
+                render: (r) => <div className="text-white/80">/{r.apiSlug}</div>,
+                sortValue: (r) => r.apiSlug,
+                filterValue: (r) => r.apiSlug,
+              },
+              {
+                key: 'path',
+                header: t('common.path'),
+                render: (r) => <div className="text-white/80">{r.publicPath}</div>,
+                sortValue: (r) => r.publicPath,
+                filterValue: (r) => r.publicPath,
+              },
+              {
+                key: 'total',
+                header: 'Total',
+                render: (r) => <div className="text-white/80">{r.total.toLocaleString('pt-BR')}</div>,
+                sortValue: (r) => r.total,
+                filterValue: (r) => String(r.total),
+              },
+              {
+                key: 'success',
+                header: 'Sucesso',
+                render: (r) => <div className="text-white/80">{r.success.toLocaleString('pt-BR')}</div>,
+                sortValue: (r) => r.success,
+                filterValue: (r) => String(r.success),
+              },
+              {
+                key: 'error',
+                header: 'Erros',
+                render: (r) => <div className="text-white/80">{r.error.toLocaleString('pt-BR')}</div>,
+                sortValue: (r) => r.error,
+                filterValue: (r) => String(r.error),
+              },
+              {
+                key: 'avg',
+                header: 'AVG',
+                render: (r) => <div className="text-white/70">{r.avgLatencyMs ?? '—'} ms</div>,
+                sortValue: (r) => r.avgLatencyMs ?? 0,
+                filterValue: (r) => String(r.avgLatencyMs ?? ''),
+              },
+              {
+                key: 'p95',
+                header: 'P95',
+                render: (r) => <div className="text-white/70">{r.p95LatencyMs ?? '—'} ms</div>,
+                sortValue: (r) => r.p95LatencyMs ?? 0,
+                filterValue: (r) => String(r.p95LatencyMs ?? ''),
+              },
+            ]}
+            empty={endpointQ.isPending ? t('common.loading') : t('common.noData')}
+          />
+        </CardBody>
+      </Card>
+
+      <Card className="mt-4">
+        <CardHeader
+          title={t('dashboard.heatmap.title')}
+          description={t('dashboard.heatmap.description')}
+          right={
+            <div className="text-xs text-white/55">
+              {heatmapQ.isPending ? 'Carregando…' : 'Últimas 24h ou janela selecionada'}
+            </div>
+          }
+        />
+        <CardBody>
+          {(() => {
+            const cells = heatmapQ.data ?? [];
+            const map = new Map<string, HeatmapCell>();
+            for (const c of cells) map.set(`${c.dow}:${c.hour}`, c);
+
+            const days: Array<{ key: number; label: string }> = [
+              { key: 1, label: 'Seg' },
+              { key: 2, label: 'Ter' },
+              { key: 3, label: 'Qua' },
+              { key: 4, label: 'Qui' },
+              { key: 5, label: 'Sex' },
+              { key: 6, label: 'Sáb' },
+              { key: 0, label: 'Dom' },
+            ];
+            const hours = Array.from({ length: 24 }, (_, i) => i);
+
+            const maxTotal = Math.max(1, ...cells.map((c) => c.total));
+            const maxErrors = Math.max(1, ...cells.map((c) => c.errors));
+
+            const cellBox = 'h-5 w-5 rounded-md border border-white/10';
+            const heatColor = (v: number, max: number, base: 'accent' | 'danger') => {
+              const ratio = max <= 0 ? 0 : v / max;
+              const a = Math.min(0.9, Math.max(0.06, ratio * 0.9));
+              if (base === 'danger') return `rgba(244,63,94,${a})`;
+              return `rgba(124,58,237,${a})`;
+            };
+
+            const grid = (kind: 'total' | 'errors') => (
+              <div className="overflow-auto">
+                <div className="min-w-[720px]">
+                  <div className="grid grid-cols-[48px_repeat(24,1fr)] gap-1">
+                    <div />
+                    {hours.map((h) => (
+                      <div key={h} className="text-center text-[10px] text-white/45">
+                        {h}
+                      </div>
+                    ))}
+                    {days.map((d) => (
+                      <>
+                        <div key={`lbl-${d.key}`} className="flex items-center text-xs text-white/70">
+                          {d.label}
+                        </div>
+                        {hours.map((h) => {
+                          const c = map.get(`${d.key}:${h}`) ?? { dow: d.key, hour: h, total: 0, errors: 0 };
+                          const v = kind === 'total' ? c.total : c.errors;
+                          const max = kind === 'total' ? maxTotal : maxErrors;
+                          const bg = heatColor(v, max, kind === 'total' ? 'accent' : 'danger');
+                          const title =
+                            kind === 'total'
+                              ? `${d.label} ${String(h).padStart(2, '0')}:00 — ${c.total} ${t('dashboard.cards.requests.title')}`
+                              : `${d.label} ${String(h).padStart(2, '0')}:00 — ${c.errors} ${t('dashboard.heatmap.errors')}`;
+                          return (
+                            <div
+                              key={`${d.key}:${h}:${kind}`}
+                              className={cellBox}
+                              style={{ backgroundColor: bg }}
+                              title={title}
+                            />
+                          );
+                        })}
+                      </>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            );
+
+            return (
+              <div className="grid gap-6">
+                <div>
+                  <div className="text-xs font-medium text-white/70">{t('dashboard.heatmap.traffic')}</div>
+                  <div className="mt-3">{grid('total')}</div>
+                </div>
+                <div>
+                  <div className="text-xs font-medium text-white/70">{t('dashboard.heatmap.errors')}</div>
+                  <div className="mt-3">{grid('errors')}</div>
+                </div>
+                {heatmapQ.isPending ? <div className="text-sm text-white/60">Carregando…</div> : null}
+              </div>
+            );
+          })()}
+        </CardBody>
+      </Card>
+
       <Modal
         open={Boolean(openId)}
         onClose={() => setOpenId(null)}
-        title="Log Detail"
+        title={t('dashboard.logDetail.title')}
         size="full"
         footer={
           <div className="flex items-center justify-end gap-2">
             <Button variant="secondary" onClick={() => setOpenId(null)}>
-              Close
+              {t('common.close')}
             </Button>
           </div>
         }
@@ -618,35 +857,35 @@ export default function DashboardPage() {
           <div className="grid gap-4">
             <div className="grid gap-2 sm:grid-cols-2">
               <div className="rounded-xl border border-white/10 bg-white/5 p-4">
-                <div className="text-xs font-medium text-white/70">Original URL</div>
+                <div className="text-xs font-medium text-white/70">{t('common.originalUrl')}</div>
                 <div className="mt-2 break-words text-sm text-white/80">{detail.originalUrl}</div>
               </div>
               <div className="rounded-xl border border-white/10 bg-white/5 p-4">
-                <div className="text-xs font-medium text-white/70">Final URL</div>
+                <div className="text-xs font-medium text-white/70">{t('common.finalUrl')}</div>
                 <div className="mt-2 break-words text-sm text-white/80">{detail.finalUrl ?? '—'}</div>
               </div>
             </div>
 
             <div className="grid gap-2 sm:grid-cols-2">
               <div className="rounded-xl border border-white/10 bg-white/5 p-4">
-                <div className="text-xs font-medium text-white/70">Request At</div>
+                <div className="text-xs font-medium text-white/70">{t('common.requestAt')}</div>
                 <div className="mt-2 text-sm text-white/80">{formatDateTime(detail.createdAt, tz)}</div>
               </div>
               <div className="rounded-xl border border-white/10 bg-white/5 p-4">
-                <div className="text-xs font-medium text-white/70">Response At</div>
+                <div className="text-xs font-medium text-white/70">{t('common.responseAt')}</div>
                 <div className="mt-2 text-sm text-white/80">{formatDateTime(detail.responseAt, tz)}</div>
               </div>
             </div>
 
             <div className="grid gap-4 lg:grid-cols-2">
               <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                <div className="text-xs font-medium text-white/70">Request Headers</div>
+                <div className="text-xs font-medium text-white/70">{t('dashboard.logDetail.requestHeaders')}</div>
                 <pre className="mt-3 max-w-full rounded-xl border border-white/10 bg-black/30 p-3 text-xs text-white/75" style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', wordBreak: 'break-word' }}>
                   {JSON.stringify(detail.requestHeaders ?? {}, null, 2)}
                 </pre>
               </div>
               <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                <div className="text-xs font-medium text-white/70">Response Headers</div>
+                <div className="text-xs font-medium text-white/70">{t('dashboard.logDetail.responseHeaders')}</div>
                 <pre className="mt-3 max-w-full rounded-xl border border-white/10 bg-black/30 p-3 text-xs text-white/75" style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', wordBreak: 'break-word' }}>
                   {JSON.stringify(detail.responseHeaders ?? {}, null, 2)}
                 </pre>
@@ -655,7 +894,7 @@ export default function DashboardPage() {
 
             <div className="grid gap-4 lg:grid-cols-2">
               <div className="min-w-0 rounded-2xl border border-white/10 bg-white/5 p-4">
-                <div className="text-xs font-medium text-white/70">Request Body (raw)</div>
+                <div className="text-xs font-medium text-white/70">{t('dashboard.logDetail.requestBody')}</div>
                 <pre
                   className="mt-3 max-w-full rounded-xl border border-white/10 bg-black/30 p-3 text-xs text-white/75"
                   style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', wordBreak: 'break-word' }}
@@ -665,9 +904,9 @@ export default function DashboardPage() {
               </div>
               <div className="min-w-0 rounded-2xl border border-white/10 bg-white/5 p-4">
                 <div className="flex items-center justify-between gap-3">
-                  <div className="text-xs font-medium text-white/70">Response Body (raw)</div>
+                  <div className="text-xs font-medium text-white/70">{t('dashboard.logDetail.responseBody')}</div>
                   <Button variant="ghost" size="sm" onClick={downloadResponseBody} disabled={!detail.responseBody}>
-                    Download
+                    {t('common.download')}
                   </Button>
                 </div>
                 <pre
