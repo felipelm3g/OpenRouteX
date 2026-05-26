@@ -1,4 +1,4 @@
-import { randomUUID } from 'crypto';
+import { createHash, randomInt, randomUUID, timingSafeEqual } from 'crypto';
 
 import { BadRequestException, Body, Controller, ForbiddenException, Get, HttpException, Post, Query, Req, UnauthorizedException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -15,6 +15,27 @@ import { RedisService } from '../rate-limit/redis.service';
 import { SystemSettingEntity } from '../settings/settings.entity';
 import { SettingsService } from '../settings/settings.service';
 import { UsersService } from '../users/users.service';
+
+function normalizeEmail(v: string) {
+  return String(v ?? '').trim().toLowerCase();
+}
+
+function passwordResetCode() {
+  return String(randomInt(0, 1_000_000)).padStart(6, '0');
+}
+
+function passwordResetCodeHash(email: string, code: string) {
+  const e = normalizeEmail(email);
+  const c = String(code ?? '').trim();
+  return createHash('sha256').update(`${e}:${c}`).digest('hex');
+}
+
+function safeEqualHex(a: string, b: string) {
+  const aa = String(a ?? '');
+  const bb = String(b ?? '');
+  if (aa.length !== bb.length) return false;
+  return timingSafeEqual(Buffer.from(aa), Buffer.from(bb));
+}
 
 @Controller()
 export class SystemController {
@@ -40,6 +61,140 @@ export class SystemController {
 
   @Get('/health')
   health() {
+    return { ok: true };
+  }
+
+  @Post('/password-reset/request-code')
+  async requestPasswordResetCode(@Body() body: { email?: string }, @Req() req: any) {
+    const cfg = await this.settings.getSettings();
+    const smtpReady = Boolean(cfg.smtpHost?.trim()) && Boolean(cfg.smtpFrom?.trim());
+    if (!smtpReady) {
+      throw new HttpException(
+        { error: 'email_not_configured', message: 'Email não configurado. Verifique SMTP em Configurações.' },
+        400,
+      );
+    }
+
+    const email = normalizeEmail(body?.email ?? '');
+    if (!email) throw new BadRequestException('Email obrigatório');
+
+    const ipRaw = String(req?.headers?.['x-forwarded-for'] ?? req?.ip ?? '').trim();
+    const ip = (ipRaw.split(',')[0] ?? '').trim() || 'unknown';
+
+    const rlKey = `orx:pwdreset:rl:${ip}:${email}`;
+    const throttled = await this.redis.client.get(rlKey);
+    if (throttled) return { ok: true };
+    await this.redis.client.set(rlKey, '1', 'EX', 60);
+
+    const user = await this.users.findEntityByEmail(email);
+    if (!user) return { ok: true };
+    const to = String(user.email ?? '').trim();
+    if (!to) return { ok: true };
+
+    const code = passwordResetCode();
+    const key = `orx:pwdreset:code:${email}`;
+    await this.redis.client.set(
+      key,
+      JSON.stringify({ userId: user.id, codeHash: passwordResetCodeHash(email, code), attempts: 0 }),
+      'EX',
+      60 * 60,
+    );
+
+    const html = `
+      <div style="font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;max-width:640px;margin:0 auto;padding:24px;">
+        <div style="border:1px solid #e5e7eb;border-radius:16px;overflow:hidden;background:#ffffff;">
+          <div style="padding:18px 20px;background:#0b1020;color:#ffffff;">
+            <div style="font-size:14px;opacity:.9;">OpenRouteX</div>
+            <div style="margin-top:6px;font-size:18px;font-weight:700;">Código de redefinição de senha</div>
+          </div>
+          <div style="padding:20px;color:#111827;font-size:14px;line-height:1.6;">
+            <p style="margin:0 0 12px 0;">
+              Recebemos uma solicitação para redefinir sua senha.
+            </p>
+            <p style="margin:0 0 12px 0;">
+              Use o código abaixo para continuar. Ele expira em <b>1 hora</b>.
+            </p>
+            <div style="margin:18px 0;padding:16px;border:1px dashed #e5e7eb;border-radius:14px;background:#f9fafb;text-align:center;">
+              <div style="font-size:12px;color:#6b7280;letter-spacing:.08em;">CÓDIGO</div>
+              <div style="margin-top:6px;font-size:28px;font-weight:800;letter-spacing:.18em;color:#111827;">${code}</div>
+            </div>
+            <div style="margin-top:12px;font-size:12px;color:#6b7280;">
+              Se você não solicitou essa redefinição, ignore este email.
+            </div>
+          </div>
+        </div>
+      </div>
+    `.trim();
+
+    const sent = await this.email.send({
+      to,
+      subject: 'OpenRouteX: código de redefinição de senha',
+      text:
+        `Recebemos uma solicitação para redefinir sua senha.\n\n` +
+        `Seu código: ${code}\n\n` +
+        `Validade: 1 hora.\n\n` +
+        `Se você não solicitou, ignore este email.`,
+      html,
+    });
+
+    if (!sent.ok) {
+      throw new HttpException(
+        { error: 'email_failed', message: 'Falha ao enviar email. Verifique SMTP em Configurações.' },
+        400,
+      );
+    }
+
+    return { ok: true };
+  }
+
+  @Post('/password-reset/confirm-code')
+  async confirmPasswordResetCode(@Body() body: { email?: string; code?: string; password?: string }) {
+    const email = normalizeEmail(body?.email ?? '');
+    const code = String(body?.code ?? '').trim();
+    const password = String(body?.password ?? '').trim();
+    if (!email) throw new BadRequestException('Email obrigatório');
+    if (!code) throw new BadRequestException('Código obrigatório');
+    if (!password) throw new BadRequestException('Senha obrigatória');
+
+    const key = `orx:pwdreset:code:${email}`;
+    const raw = await this.redis.client.get(key);
+    if (!raw) throw new BadRequestException('Código inválido ou expirado');
+
+    let userId = '';
+    let expectedHash = '';
+    let attempts = 0;
+    try {
+      const parsed = JSON.parse(raw) as { userId?: unknown; codeHash?: unknown; attempts?: unknown };
+      userId = String(parsed?.userId ?? '').trim();
+      expectedHash = String(parsed?.codeHash ?? '').trim();
+      attempts = Number(parsed?.attempts ?? 0);
+    } catch (e: any) {
+      void e;
+    }
+
+    if (!userId || !expectedHash) throw new BadRequestException('Código inválido ou expirado');
+    if (!safeEqualHex(expectedHash, passwordResetCodeHash(email, code))) {
+      const nextAttempts = attempts + 1;
+      const ttl = await this.redis.client.ttl(key);
+      if (nextAttempts >= 10) {
+        await this.redis.client.del(key);
+        throw new BadRequestException('Código inválido ou expirado');
+      }
+      if (ttl > 0) {
+        await this.redis.client.set(
+          key,
+          JSON.stringify({ userId, codeHash: expectedHash, attempts: nextAttempts }),
+          'EX',
+          ttl,
+        );
+      }
+      throw new BadRequestException('Código inválido ou expirado');
+    }
+
+    const u = await this.users.getEntity(userId);
+    await this.users.setPasswordById(userId, password);
+    await this.users.clearLoginLock(u.username);
+    await this.redis.client.del(key);
     return { ok: true };
   }
 

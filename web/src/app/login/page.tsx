@@ -59,8 +59,10 @@ export default function LoginPage() {
   });
 
   return (
-    <div className="flex min-h-dvh w-full items-center justify-center bg-[radial-gradient(1200px_700px_at_20%_10%,rgba(124,58,237,0.18),transparent_60%),radial-gradient(1000px_650px_at_80%_20%,rgba(59,130,246,0.12),transparent_60%),linear-gradient(180deg,#050716,#0b1020)] px-6 py-16">
-      <div className="w-full max-w-md">
+    <div className="relative flex min-h-dvh w-full items-center justify-center px-6 py-16">
+      <div className="absolute inset-0 bg-[url('/background_OpenRouteX.png')] bg-cover bg-center" />
+      <div className="absolute inset-0 bg-[radial-gradient(1200px_700px_at_20%_10%,rgba(124,58,237,0.20),transparent_60%),radial-gradient(1000px_650px_at_80%_20%,rgba(59,130,246,0.14),transparent_60%),linear-gradient(180deg,rgba(5,7,22,0.72),rgba(11,16,32,0.86))]" />
+      <div className="relative w-full max-w-md">
         <Card>
           <CardHeader title={t('login.title')} description={t('login.subtitle')} />
           <CardBody>
@@ -80,8 +82,11 @@ export default function LoginPage() {
               <Button onClick={() => login.mutate()} disabled={login.isPending}>
                 {t('login.submit')}
               </Button>
-              <div className="text-center text-xs text-white/55">
-                <Link href="/" className="hover:text-white/80">
+              <div className="flex items-center justify-between text-xs">
+                <Link href="/forgot-password" className="text-white/65 hover:text-white/85">
+                  {t('login.forgot')}
+                </Link>
+                <Link href="/" className="text-white/55 hover:text-white/80">
                   {t('common.back')}
                 </Link>
               </div>

@@ -92,6 +92,27 @@ function errorMessage(e: unknown) {
   return typeof msg === 'string' && msg.trim() ? msg : 'Falha';
 }
 
+const IconEdit = ({ className }: { className?: string }) => (
+  <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden="true">
+    <path
+      d="M4 20h4l10.5-10.5a2.828 2.828 0 0 0 0-4L18.5 4a2.828 2.828 0 0 0-4 0L4 14.5V20Z"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinejoin="round"
+    />
+    <path d="M13.5 5.5l5 5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+  </svg>
+);
+
+const IconTrash = ({ className }: { className?: string }) => (
+  <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden="true">
+    <path d="M4 7h16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+    <path d="M10 11v6M14 11v6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+    <path d="M6 7l1 14h10l1-14" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" />
+    <path d="M9 7V4h6v3" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" />
+  </svg>
+);
+
 export default function AuthenticationPage() {
   const { t } = useI18n();
   const qc = useQueryClient();
@@ -246,16 +267,24 @@ export default function AuthenticationPage() {
                 header: t('common.actions'),
                 render: (r) => (
                   <div className="flex items-center gap-2">
-                    <Button variant="secondary" size="sm" onClick={() => beginEdit(r)}>
-                      {t('common.edit')}
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => beginEdit(r)}
+                      title={t('common.edit')}
+                      ariaLabel={t('common.edit')}
+                    >
+                      <IconEdit className="h-4 w-4" />
                     </Button>
                     <Button
                       variant="danger"
-                      size="sm"
+                      size="icon"
                       onClick={() => askDelete(r)}
                       disabled={del.isPending}
+                      title={t('common.delete')}
+                      ariaLabel={t('common.delete')}
                     >
-                      {t('common.delete')}
+                      <IconTrash className="h-4 w-4" />
                     </Button>
                   </div>
                 ),

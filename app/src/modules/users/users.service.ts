@@ -173,6 +173,13 @@ export class UsersService implements OnModuleInit {
     return u;
   }
 
+  async findEntityByEmail(email: string) {
+    const normalized = normalizeEmail(email);
+    if (!normalized) return null;
+    const u = await this.repo.findOne({ where: { email: normalized } });
+    return u ?? null;
+  }
+
   async authenticate(username: string, password: string) {
     const u = await this.repo.findOne({ where: { username: normalizeUsername(username) } });
     if (!u) throw new NotFoundException('Usuário não encontrado');
