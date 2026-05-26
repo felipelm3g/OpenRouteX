@@ -161,6 +161,8 @@
   "settings.dashboard.metricsRefetch.help": "How often the dashboard refreshes the charts.",
   "settings.dashboard.logsRefetch": "Dashboard refresh (logs) (ms)",
   "settings.dashboard.logsRefetch.help": "How often the dashboard refreshes the log list.",
+  "settings.dashboard.colorize": "Dashboard colors",
+  "settings.dashboard.colorize.help": "Enable/disable colored numbers (success/error/latency) in the endpoint report.",
   "settings.gateway.title": "Gateway",
   "settings.gateway.description": "Defaults applied by the proxy when a route does not override them.",
   "settings.gateway.proxyTimeoutMs": "Proxy default timeout (ms)",

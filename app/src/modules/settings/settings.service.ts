@@ -50,6 +50,7 @@ const DEFAULTS: SettingsDto = {
   logsCleanupIntervalMinutes: 60,
   dashboardMetricsRefetchMs: 5000,
   dashboardLogsRefetchMs: 2000,
+  dashboardColorizeEnabled: true,
   proxyTimeoutMs: 30000,
   defaultForwardClientQuery: true,
   apiKeyHeaderName: 'API-KEY',
@@ -97,6 +98,7 @@ export class SettingsService {
 
     const dashboardMetricsRefetchMs = parseIntSafe(all.dashboardMetricsRefetchMs, DEFAULTS.dashboardMetricsRefetchMs, 1000, 600000);
     const dashboardLogsRefetchMs = parseIntSafe(all.dashboardLogsRefetchMs, DEFAULTS.dashboardLogsRefetchMs, 1000, 600000);
+    const dashboardColorizeEnabled = parseBool(all.dashboardColorizeEnabled, DEFAULTS.dashboardColorizeEnabled);
     const proxyTimeoutMs = parseIntSafe(all.proxyTimeoutMs, parseIntSafe(process.env.PROXY_TIMEOUT_MS, DEFAULTS.proxyTimeoutMs, 1000, 600000), 1000, 600000);
     const defaultForwardClientQuery = parseBool(all.defaultForwardClientQuery, DEFAULTS.defaultForwardClientQuery);
     const apiKeyHeaderName = String(all.apiKeyHeaderName ?? DEFAULTS.apiKeyHeaderName).trim() || DEFAULTS.apiKeyHeaderName;
@@ -129,6 +131,7 @@ export class SettingsService {
       logsCleanupIntervalMinutes,
       dashboardMetricsRefetchMs,
       dashboardLogsRefetchMs,
+      dashboardColorizeEnabled,
       proxyTimeoutMs,
       defaultForwardClientQuery,
       apiKeyHeaderName,
@@ -168,6 +171,8 @@ export class SettingsService {
       updates.push(['dashboardMetricsRefetchMs', String(dto.dashboardMetricsRefetchMs)]);
     if (dto.dashboardLogsRefetchMs !== undefined)
       updates.push(['dashboardLogsRefetchMs', String(dto.dashboardLogsRefetchMs)]);
+    if (dto.dashboardColorizeEnabled !== undefined)
+      updates.push(['dashboardColorizeEnabled', String(Boolean(dto.dashboardColorizeEnabled))]);
     if (dto.proxyTimeoutMs !== undefined) updates.push(['proxyTimeoutMs', String(dto.proxyTimeoutMs)]);
     if (dto.defaultForwardClientQuery !== undefined)
       updates.push(['defaultForwardClientQuery', String(Boolean(dto.defaultForwardClientQuery))]);

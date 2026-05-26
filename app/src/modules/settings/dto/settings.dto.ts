@@ -46,6 +46,10 @@ export class UpdateSettingsDto {
   dashboardLogsRefetchMs?: number;
 
   @IsOptional()
+  @IsBoolean()
+  dashboardColorizeEnabled?: boolean;
+
+  @IsOptional()
   @IsInt()
   @Min(1000)
   @Max(600000)
@@ -156,6 +160,7 @@ export type SettingsDto = {
   logsRetentionDaysError: number;
   dashboardMetricsRefetchMs: number;
   dashboardLogsRefetchMs: number;
+  dashboardColorizeEnabled: boolean;
   proxyTimeoutMs: number;
   defaultForwardClientQuery: boolean;
   apiKeyHeaderName: string;

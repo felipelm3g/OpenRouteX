@@ -25,6 +25,7 @@ type SettingsDto = {
   logsCleanupIntervalMinutes: number;
   dashboardMetricsRefetchMs: number;
   dashboardLogsRefetchMs: number;
+  dashboardColorizeEnabled: boolean;
 };
 
 type LogRow = {
@@ -179,6 +180,7 @@ export default function DashboardPage() {
   const tz = settingsQ.data?.timezone || 'UTC';
   const metricsRefetch = settingsQ.data?.dashboardMetricsRefetchMs ?? 5000;
   const logsRefetch = settingsQ.data?.dashboardLogsRefetchMs ?? 2000;
+  const colorize = settingsQ.data?.dashboardColorizeEnabled ?? true;
 
   const [latencyUnit, setLatencyUnit] = useState<LatencyUnit>('ms');
   const [api, setApi] = useState('');
@@ -355,6 +357,23 @@ export default function DashboardPage() {
     const opts = raw.map((x) => ({ value: String(x.value), label: `${x.value} (${x.count})` }));
     return [{ value: '', label: 'Status: todos' }, ...opts];
   }, [metaApisQ.data, metaStatusQ.data]);
+
+  const latencyTextClass = (ms: number | null | undefined) => {
+    const base = 'text-white/70';
+    if (!colorize) return base;
+    if (ms === null || ms === undefined) return base;
+    if (!Number.isFinite(ms)) return base;
+    if (ms < 2000) return base;
+    if (ms < 5000) return 'text-amber-200';
+    return 'text-rose-200';
+  };
+
+  const countTextClass = (n: number, kind: 'success' | 'error') => {
+    const base = 'text-white/80';
+    if (!colorize) return base;
+    if (n <= 0) return base;
+    return kind === 'success' ? 'text-emerald-200' : 'text-rose-200';
+  };
 
   const latencyUnitLabel = latencyUnit === 'ms' ? 'ms' : 's';
   const latencyUnitOptions = useMemo(
@@ -755,28 +774,28 @@ export default function DashboardPage() {
               {
                 key: 'success',
                 header: 'Sucesso',
-                render: (r) => <div className="text-white/80">{r.success.toLocaleString('pt-BR')}</div>,
+                render: (r) => <div className={countTextClass(r.success, 'success')}>{r.success.toLocaleString('pt-BR')}</div>,
                 sortValue: (r) => r.success,
                 filterValue: (r) => String(r.success),
               },
               {
                 key: 'error',
                 header: 'Erros',
-                render: (r) => <div className="text-white/80">{r.error.toLocaleString('pt-BR')}</div>,
+                render: (r) => <div className={countTextClass(r.error, 'error')}>{r.error.toLocaleString('pt-BR')}</div>,
                 sortValue: (r) => r.error,
                 filterValue: (r) => String(r.error),
               },
               {
                 key: 'avg',
                 header: 'AVG',
-                render: (r) => <div className="text-white/70">{formatLatency(r.avgLatencyMs, latencyUnit)}</div>,
+                render: (r) => <div className={latencyTextClass(r.avgLatencyMs)}>{formatLatency(r.avgLatencyMs, latencyUnit)}</div>,
                 sortValue: (r) => r.avgLatencyMs ?? 0,
                 filterValue: (r) => String(r.avgLatencyMs ?? ''),
               },
               {
                 key: 'p95',
                 header: 'P95',
-                render: (r) => <div className="text-white/70">{formatLatency(r.p95LatencyMs, latencyUnit)}</div>,
+                render: (r) => <div className={latencyTextClass(r.p95LatencyMs)}>{formatLatency(r.p95LatencyMs, latencyUnit)}</div>,
                 sortValue: (r) => r.p95LatencyMs ?? 0,
                 filterValue: (r) => String(r.p95LatencyMs ?? ''),
               },

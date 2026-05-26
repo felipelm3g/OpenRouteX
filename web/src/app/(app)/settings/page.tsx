@@ -17,6 +17,7 @@ type SettingsDto = {
   logsCleanupIntervalMinutes: number;
   dashboardMetricsRefetchMs: number;
   dashboardLogsRefetchMs: number;
+  dashboardColorizeEnabled: boolean;
   proxyTimeoutMs: number;
   defaultForwardClientQuery: boolean;
   apiKeyHeaderName: string;
@@ -99,6 +100,7 @@ export default function SettingsPage() {
   const [logsRetentionDaysError, setLogsRetentionDaysError] = useState('90');
   const [dashboardMetricsRefetchMs, setDashboardMetricsRefetchMs] = useState('5000');
   const [dashboardLogsRefetchMs, setDashboardLogsRefetchMs] = useState('2000');
+  const [dashboardColorizeEnabled, setDashboardColorizeEnabled] = useState('true');
   const [proxyTimeoutMs, setProxyTimeoutMs] = useState('30000');
   const [defaultForwardClientQuery, setDefaultForwardClientQuery] = useState('true');
   const [apiKeyHeaderName, setApiKeyHeaderName] = useState('API-KEY');
@@ -136,6 +138,7 @@ export default function SettingsPage() {
       setLogsRetentionDaysError(String(data.logsRetentionDaysError ?? 90));
       setDashboardMetricsRefetchMs(String(data.dashboardMetricsRefetchMs ?? 5000));
       setDashboardLogsRefetchMs(String(data.dashboardLogsRefetchMs ?? 2000));
+      setDashboardColorizeEnabled(String(Boolean(data.dashboardColorizeEnabled ?? true)));
       setProxyTimeoutMs(String(data.proxyTimeoutMs ?? 30000));
       setDefaultForwardClientQuery(String(Boolean(data.defaultForwardClientQuery ?? true)));
       setApiKeyHeaderName(String(data.apiKeyHeaderName ?? 'API-KEY'));
@@ -171,6 +174,7 @@ export default function SettingsPage() {
         logsRetentionDaysError: number;
         dashboardMetricsRefetchMs: number;
         dashboardLogsRefetchMs: number;
+        dashboardColorizeEnabled: boolean;
         proxyTimeoutMs: number;
         defaultForwardClientQuery: boolean;
         apiKeyHeaderName: string;
@@ -200,6 +204,7 @@ export default function SettingsPage() {
         logsRetentionDaysError: Number(logsRetentionDaysError),
         dashboardMetricsRefetchMs: Number(dashboardMetricsRefetchMs),
         dashboardLogsRefetchMs: Number(dashboardLogsRefetchMs),
+        dashboardColorizeEnabled: dashboardColorizeEnabled === 'true',
         proxyTimeoutMs: Number(proxyTimeoutMs),
         defaultForwardClientQuery: defaultForwardClientQuery === 'true',
         apiKeyHeaderName: apiKeyHeaderName.trim() || 'API-KEY',
@@ -387,6 +392,22 @@ export default function SettingsPage() {
                 <TextInput value={dashboardLogsRefetchMs} onChange={setDashboardLogsRefetchMs} type="number" placeholder="2000" />
               </div>
               <div className="mt-2 text-xs text-white/55">{t('settings.dashboard.logsRefetch.help')}</div>
+            </div>
+          </div>
+
+          <div className="mt-5 grid gap-4 sm:grid-cols-2">
+            <div>
+              <div className="text-xs font-medium text-white/70">{t('settings.dashboard.colorize')}</div>
+              <div className="mt-2">
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => setDashboardColorizeEnabled((v) => (v === 'true' ? 'false' : 'true'))}
+                >
+                  {dashboardColorizeEnabled === 'true' ? t('common.enabled') : t('common.disabled')}
+                </Button>
+              </div>
+              <div className="mt-2 text-xs text-white/55">{t('settings.dashboard.colorize.help')}</div>
             </div>
           </div>
         </CardBody>
