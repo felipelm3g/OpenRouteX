@@ -68,6 +68,8 @@ type LogsMetaDto = {
   statuses: Array<{ value: number; count: number }>;
 };
 
+type LatencyUnit = 'ms' | 's';
+
 function getCookieValue(name: string): string {
   if (typeof document === 'undefined') return '';
   const parts = document.cookie.split(';');
@@ -102,6 +104,19 @@ function formatDateTime(iso: string | null | undefined, timeZone: string) {
     minute: '2-digit',
     second: '2-digit',
   }).format(d);
+}
+
+function trimTrailingZeros(s: string) {
+  return s.replace(/(\.\d*?[1-9])0+$/, '$1').replace(/\.0+$/, '');
+}
+
+function formatLatency(ms: number | null | undefined, unit: LatencyUnit) {
+  if (ms === null || ms === undefined) return '—';
+  if (!Number.isFinite(ms)) return '—';
+  if (unit === 'ms') return `${Math.round(ms)} ms`;
+  const sec = ms / 1000;
+  const s = sec >= 10 ? sec.toFixed(1) : sec.toFixed(2);
+  return `${trimTrailingZeros(s)} s`;
 }
 
 function parseDateTimeLocal(s: string) {
@@ -165,6 +180,7 @@ export default function DashboardPage() {
   const metricsRefetch = settingsQ.data?.dashboardMetricsRefetchMs ?? 5000;
   const logsRefetch = settingsQ.data?.dashboardLogsRefetchMs ?? 2000;
 
+  const [latencyUnit, setLatencyUnit] = useState<LatencyUnit>('ms');
   const [api, setApi] = useState('');
   const [path, setPath] = useState('');
   const [status, setStatus] = useState('');
@@ -180,6 +196,17 @@ export default function DashboardPage() {
     const t = setTimeout(() => setOpenFromUrl(v), 0);
     return () => clearTimeout(t);
   }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const raw = String(window.localStorage.getItem('orx:dashboard:latencyUnit') ?? '').trim().toLowerCase();
+    if (raw === 'ms' || raw === 's') setLatencyUnit(raw as LatencyUnit);
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    window.localStorage.setItem('orx:dashboard:latencyUnit', latencyUnit);
+  }, [latencyUnit]);
 
   useEffect(() => {
     if (!openFromUrl) return;
@@ -329,6 +356,15 @@ export default function DashboardPage() {
     return [{ value: '', label: 'Status: todos' }, ...opts];
   }, [metaApisQ.data, metaStatusQ.data]);
 
+  const latencyUnitLabel = latencyUnit === 'ms' ? 'ms' : 's';
+  const latencyUnitOptions = useMemo(
+    () => [
+      { value: 'ms', label: 'Latência: ms' },
+      { value: 's', label: 'Latência: s' },
+    ],
+    [],
+  );
+
   const downloadResponseBody = () => {
     if (!detail?.responseBody) return;
     const contentType = (() => {
@@ -433,10 +469,11 @@ export default function DashboardPage() {
           }
         />
         <CardBody>
-          <div className="grid gap-3 lg:grid-cols-5">
+          <div className="grid gap-3 lg:grid-cols-6">
             <Select value={api} onChange={setApi} options={apiOptions} />
             <Select value={path} onChange={setPath} options={pathOptions} />
             <Select value={status} onChange={setStatus} options={statusOptions} />
+            <Select value={latencyUnit} onChange={(v) => setLatencyUnit(v as LatencyUnit)} options={latencyUnitOptions} />
             <TextInput value={from} onChange={setFrom} placeholder={t('common.from')} type="datetime-local" />
             <TextInput value={to} onChange={setTo} placeholder={t('common.to')} type="datetime-local" />
           </div>
@@ -471,26 +508,32 @@ export default function DashboardPage() {
           </CardBody>
         </Card>
         <Card className="lg:col-span-1">
-          <CardHeader title={t('dashboard.cards.latencyAvg.title')} description={t('dashboard.cards.latencyAvg.description')} />
+          <CardHeader
+            title={t('dashboard.cards.latencyAvg.title')}
+            description={t('dashboard.cards.latencyAvg.description').replace(/\([^)]*\)/, `(${latencyUnitLabel})`)}
+          />
           <CardBody>
             {loading ? (
               <Skeleton className="h-8 w-20" />
             ) : (
               <div className="text-2xl font-semibold text-zinc-50">
-                {m?.avgLatencyMs ?? '—'}
+                {formatLatency(m?.avgLatencyMs ?? null, latencyUnit)}
               </div>
             )}
             <div className="mt-2 text-sm text-white/55">{t('dashboard.cards.latencyAvg.note')}</div>
           </CardBody>
         </Card>
         <Card className="lg:col-span-1">
-          <CardHeader title={t('dashboard.cards.latencyP95.title')} description={t('dashboard.cards.latencyP95.description')} />
+          <CardHeader
+            title={t('dashboard.cards.latencyP95.title')}
+            description={t('dashboard.cards.latencyP95.description').replace(/\([^)]*\)/, `(${latencyUnitLabel})`)}
+          />
           <CardBody>
             {loading ? (
               <Skeleton className="h-8 w-20" />
             ) : (
               <div className="text-2xl font-semibold text-zinc-50">
-                {m?.p95LatencyMs ?? '—'}
+                {formatLatency(m?.p95LatencyMs ?? null, latencyUnit)}
               </div>
             )}
             <div className="mt-2 text-sm text-white/55">{t('dashboard.cards.latencyP95.note')}</div>
@@ -615,7 +658,7 @@ export default function DashboardPage() {
               {
                 key: 'lat',
                 header: t('common.latency'),
-                render: (r) => <div className="text-white/70">{r.durationMs ?? '—'} ms</div>,
+                render: (r) => <div className="text-white/70">{formatLatency(r.durationMs, latencyUnit)}</div>,
                 sortValue: (r) => r.durationMs ?? 0,
                 filterValue: (r) => String(r.durationMs ?? ''),
               },
@@ -653,7 +696,7 @@ export default function DashboardPage() {
                   {r.apiSlug ? `/${r.apiSlug}` : '—'} {r.publicPath ?? ''}
                 </div>
                 <div className="text-xs text-white/55">
-                  {formatDateTime(r.createdAt, tz)} • {r.durationMs ?? '—'} ms
+                  {formatDateTime(r.createdAt, tz)} • {formatLatency(r.durationMs, latencyUnit)}
                 </div>
                 <Button variant="secondary" size="sm" onClick={() => setOpenId(r.id)}>
                   {t('common.view')}
@@ -726,14 +769,14 @@ export default function DashboardPage() {
               {
                 key: 'avg',
                 header: 'AVG',
-                render: (r) => <div className="text-white/70">{r.avgLatencyMs ?? '—'} ms</div>,
+                render: (r) => <div className="text-white/70">{formatLatency(r.avgLatencyMs, latencyUnit)}</div>,
                 sortValue: (r) => r.avgLatencyMs ?? 0,
                 filterValue: (r) => String(r.avgLatencyMs ?? ''),
               },
               {
                 key: 'p95',
                 header: 'P95',
-                render: (r) => <div className="text-white/70">{r.p95LatencyMs ?? '—'} ms</div>,
+                render: (r) => <div className="text-white/70">{formatLatency(r.p95LatencyMs, latencyUnit)}</div>,
                 sortValue: (r) => r.p95LatencyMs ?? 0,
                 filterValue: (r) => String(r.p95LatencyMs ?? ''),
               },

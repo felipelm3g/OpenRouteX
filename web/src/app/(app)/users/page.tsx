@@ -51,6 +51,99 @@ const IconTrash = ({ className }: { className?: string }) => (
   </svg>
 );
 
+const IconPermissions = ({ className }: { className?: string }) => (
+  <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden="true">
+    <path
+      d="M12 3l8 4v6c0 5-3.5 8.5-8 9-4.5-.5-8-4-8-9V7l8-4Z"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinejoin="round"
+    />
+    <path d="M9 12l2 2 4-4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
+
+const IconMail = ({ className }: { className?: string }) => (
+  <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden="true">
+    <path
+      d="M4 7a3 3 0 0 1 3-3h10a3 3 0 0 1 3 3v10a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3V7Z"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinejoin="round"
+    />
+    <path
+      d="M6 8l6 5 6-5"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
+);
+
+const IconBlock = ({ className }: { className?: string }) => (
+  <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden="true">
+    <path
+      d="M17 20v-1a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v1"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+    <path
+      d="M9.5 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinejoin="round"
+    />
+    <path d="M23 11l-6 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+    <path d="M17 11l6 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+  </svg>
+);
+
+const IconUnblock = ({ className }: { className?: string }) => (
+  <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden="true">
+    <path
+      d="M17 20v-1a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v1"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+    <path
+      d="M9.5 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinejoin="round"
+    />
+    <path
+      d="M16 14l2 2 4-5"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
+);
+
+const IconUnlock = ({ className }: { className?: string }) => (
+  <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden="true">
+    <path
+      d="M7 10V8a5 5 0 0 1 9.6-2"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+    <path
+      d="M6 10h12a3 3 0 0 1 3 3v5a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3v-5a3 3 0 0 1 3-3Z"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinejoin="round"
+    />
+  </svg>
+);
+
 export default function UsersPage() {
   const qc = useQueryClient();
   const toast = useToast();
@@ -316,34 +409,59 @@ export default function UsersPage() {
                       <IconEdit className="h-4 w-4" />
                     </Button>
                     <Button
-                      variant="secondary"
-                      size="sm"
+                      variant="ghost"
+                      size="icon"
                       onClick={() => openPermissions(r)}
                       disabled={Boolean(r.isPrimaryAdmin)}
+                      title={t('common.permissions')}
+                      ariaLabel={t('common.permissions')}
                     >
-                      {t('common.permissions')}
+                      <IconPermissions className="h-4 w-4" />
                     </Button>
                     <Button
-                      variant="secondary"
-                      size="sm"
+                      variant="ghost"
+                      size="icon"
                       onClick={() => askSendResetEmail(r)}
                       disabled={sendResetEmail.isPending}
+                      title={t('users.resetPasswordEmail')}
+                      ariaLabel={t('users.resetPasswordEmail')}
                     >
-                      {t('users.resetPasswordEmail')}
+                      <IconMail className="h-4 w-4" />
                     </Button>
                     {!r.isPrimaryAdmin ? (
                       <>
                         {r.status === 'ACTIVE' ? (
-                          <Button variant="secondary" size="sm" onClick={() => block.mutate(r.id)} disabled={block.isPending}>
-                            {t('common.block')}
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => block.mutate(r.id)}
+                            disabled={block.isPending}
+                            title={t('common.block')}
+                            ariaLabel={t('common.block')}
+                          >
+                            <IconBlock className="h-4 w-4" />
                           </Button>
                         ) : (
-                          <Button variant="secondary" size="sm" onClick={() => unblock.mutate(r.id)} disabled={unblock.isPending}>
-                            {t('common.unblock')}
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => unblock.mutate(r.id)}
+                            disabled={unblock.isPending}
+                            title={t('common.unblock')}
+                            ariaLabel={t('common.unblock')}
+                          >
+                            <IconUnblock className="h-4 w-4" />
                           </Button>
                         )}
-                        <Button variant="secondary" size="sm" onClick={() => clearLock.mutate(r.id)} disabled={clearLock.isPending}>
-                          {t('users.clearLoginLock')}
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => clearLock.mutate(r.id)}
+                          disabled={clearLock.isPending}
+                          title={t('users.clearLoginLock')}
+                          ariaLabel={t('users.clearLoginLock')}
+                        >
+                          <IconUnlock className="h-4 w-4" />
                         </Button>
                         <Button
                           variant="danger"
@@ -379,34 +497,59 @@ export default function UsersPage() {
                     <IconEdit className="h-4 w-4" />
                   </Button>
                   <Button
-                    variant="secondary"
-                    size="sm"
+                    variant="ghost"
+                    size="icon"
                     onClick={() => openPermissions(r)}
                     disabled={Boolean(r.isPrimaryAdmin)}
+                    title={t('common.permissions')}
+                    ariaLabel={t('common.permissions')}
                   >
-                    {t('common.permissions')}
+                    <IconPermissions className="h-4 w-4" />
                   </Button>
                   <Button
-                    variant="secondary"
-                    size="sm"
+                    variant="ghost"
+                    size="icon"
                     onClick={() => askSendResetEmail(r)}
                     disabled={sendResetEmail.isPending}
+                    title={t('users.resetPasswordEmail')}
+                    ariaLabel={t('users.resetPasswordEmail')}
                   >
-                    {t('users.resetPasswordEmail')}
+                    <IconMail className="h-4 w-4" />
                   </Button>
                   {!r.isPrimaryAdmin ? (
                     <>
                       {r.status === 'ACTIVE' ? (
-                        <Button variant="secondary" size="sm" onClick={() => block.mutate(r.id)} disabled={block.isPending}>
-                          {t('common.block')}
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => block.mutate(r.id)}
+                          disabled={block.isPending}
+                          title={t('common.block')}
+                          ariaLabel={t('common.block')}
+                        >
+                          <IconBlock className="h-4 w-4" />
                         </Button>
                       ) : (
-                        <Button variant="secondary" size="sm" onClick={() => unblock.mutate(r.id)} disabled={unblock.isPending}>
-                          {t('common.unblock')}
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => unblock.mutate(r.id)}
+                          disabled={unblock.isPending}
+                          title={t('common.unblock')}
+                          ariaLabel={t('common.unblock')}
+                        >
+                          <IconUnblock className="h-4 w-4" />
                         </Button>
                       )}
-                      <Button variant="secondary" size="sm" onClick={() => clearLock.mutate(r.id)} disabled={clearLock.isPending}>
-                        {t('users.clearLoginLock')}
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => clearLock.mutate(r.id)}
+                        disabled={clearLock.isPending}
+                        title={t('users.clearLoginLock')}
+                        ariaLabel={t('users.clearLoginLock')}
+                      >
+                        <IconUnlock className="h-4 w-4" />
                       </Button>
                       <Button
                         variant="danger"
