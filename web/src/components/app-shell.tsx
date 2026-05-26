@@ -69,8 +69,12 @@ export function AppShell({
     <div className="flex h-dvh w-full overflow-hidden bg-[radial-gradient(1200px_700px_at_20%_10%,color-mix(in_oklab,var(--accent)_22%,transparent),transparent_60%),radial-gradient(1000px_650px_at_80%_20%,color-mix(in_oklab,var(--accent-2)_16%,transparent),transparent_60%),linear-gradient(180deg,color-mix(in_oklab,var(--background)_55%,#000),var(--background))]">
       <aside className="flex h-dvh w-64 shrink-0 flex-col overflow-hidden border-r border-white/8 bg-white/[0.03] p-4">
         <div className="flex items-center justify-between px-2 py-2">
-          <div className="text-sm font-semibold tracking-tight text-zinc-50">
-            OpenRouteX
+          <div className="flex items-center">
+            <img
+              src="/logo_OpenRouteX.png"
+              alt="OpenRouteX"
+              className="h-6 w-auto"
+            />
           </div>
           <span className="rounded-full bg-white/5 px-2 py-1 text-[11px] text-white/70">
             {t('app.badge')}

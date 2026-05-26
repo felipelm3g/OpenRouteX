@@ -19,6 +19,10 @@ export const metadata: Metadata = {
   title: 'OpenRouteX',
   description:
     'OpenRouteX: API Gateway self-hosted, Docker-first, com roteamento dinâmico e variáveis por API Key.',
+  icons: {
+    icon: '/favicon_OpenRouteX.png',
+    apple: '/favicon_OpenRouteX.png',
+  },
 };
 
 export default function RootLayout({

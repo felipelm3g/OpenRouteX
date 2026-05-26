@@ -319,6 +319,10 @@
   "paths.form.variablesDetected": "Variáveis detectadas: {vars}",
   "paths.table.targetUrl": "URL destino",
   "paths.table.clientAuth": "Solicitar API-KEY",
+  "paths.actions.copyUrl": "Copiar URL",
+  "paths.actions.duplicate": "Duplicar",
+  "paths.toast.urlCopied.title": "Copiado",
+  "paths.toast.urlCopied.body": "URL copiada para a área de transferência.",
 
   "authentication.title": "Credenciais Upstream",
   "authentication.subtitle": "Crie autenticações reutilizáveis para aplicar nas rotas (OAuth2/OIDC, Bearer, Basic, API Key, Custom Header, HMAC e OAuth1).",

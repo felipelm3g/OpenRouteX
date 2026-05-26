@@ -8,6 +8,7 @@ import { useI18n } from '@/components/i18n-provider';
 import { ConfirmModal, Modal } from '@/components/modal';
 import { Badge, Button, Card, CardBody, CardHeader, MethodBadge, PageShell, Select, TextInput, useToast } from '@/components/ui';
 import { apiFetch } from '@/lib/api';
+import { env } from '@/lib/env';
 import { detectVariables, detectVariablesInRecord } from '@/lib/vars';
 
 type Api = { id: string; name: string; slug: string };
@@ -87,6 +88,83 @@ export default function PathsPage() {
     for (const a of apis) out[a.id] = `${a.name} (/${a.slug})`;
     return out;
   }, [apis]);
+
+
+  const apiSlugById = useMemo(() => {
+    const map: Record<string, string> = {};
+    for (const a of apis) map[a.id] = a.slug;
+    return map;
+  }, [apis]);
+
+  const IconCopy = ({ className }: { className?: string }) => (
+    <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden="true">
+      <path
+        d="M8 7a3 3 0 0 1 3-3h7a3 3 0 0 1 3 3v8a3 3 0 0 1-3 3h-1"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+      />
+      <path
+        d="M6 20h8a3 3 0 0 0 3-3V10a3 3 0 0 0-3-3H6a3 3 0 0 0-3 3v7a3 3 0 0 0 3 3Z"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+
+  const IconEdit = ({ className }: { className?: string }) => (
+    <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden="true">
+      <path
+        d="M4 20h4l10.5-10.5a2.828 2.828 0 0 0 0-4L18.5 4a2.828 2.828 0 0 0-4 0L4 14.5V20Z"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinejoin="round"
+      />
+      <path d="M13.5 5.5l5 5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+    </svg>
+  );
+
+  const IconDuplicate = ({ className }: { className?: string }) => (
+    <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden="true">
+      <path
+        d="M8 8h10a3 3 0 0 1 3 3v8a3 3 0 0 1-3 3H8a3 3 0 0 1-3-3V11a3 3 0 0 1 3-3Z"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M16 8V7a3 3 0 0 0-3-3H6a3 3 0 0 0-3 3v8a3 3 0 0 0 3 3h1"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+
+  const IconTrash = ({ className }: { className?: string }) => (
+    <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden="true">
+      <path d="M4 7h16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+      <path
+        d="M10 11v6M14 11v6"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+      />
+      <path
+        d="M6 7l1 14h10l1-14"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M9 7V4h6v3"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
 
   const parsedAdds = useMemo(() => {
     const parse = (txt: string): Record<string, string> => {
@@ -255,6 +333,38 @@ export default function PathsPage() {
     });
   }, [del]);
 
+  const copyUrl = useCallback(
+    async (p: Path) => {
+      const apiSlug = apiSlugById[p.apiId] ?? '';
+      const rawPath = String(p.publicPath ?? '').trim();
+      const publicPath = rawPath.startsWith('/') ? rawPath : `/${rawPath}`;
+      const base =
+        env.apiBaseUrl ||
+        (typeof window !== 'undefined' ? window.location.origin : '');
+      const url = `${String(base).replace(/\/+$/, '')}/${apiSlug}${publicPath}`;
+
+      try {
+        await navigator.clipboard.writeText(url);
+        toast.info(t('paths.toast.urlCopied.title'), t('paths.toast.urlCopied.body'));
+      } catch {
+        try {
+          const el = document.createElement('textarea');
+          el.value = url;
+          el.style.position = 'fixed';
+          el.style.left = '-9999px';
+          document.body.appendChild(el);
+          el.select();
+          document.execCommand('copy');
+          el.remove();
+          toast.info(t('paths.toast.urlCopied.title'), t('paths.toast.urlCopied.body'));
+        } catch {
+          toast.error('Erro', 'Não foi possível copiar a URL.');
+        }
+      }
+    },
+    [apiSlugById, t, toast],
+  );
+
   return (
     <PageShell
       title={t('paths.title')}
@@ -339,14 +449,42 @@ export default function PathsPage() {
                 header: t('common.actions'),
                 render: (r) => (
                   <div className="flex items-center gap-2">
-                    <Button variant="secondary" size="sm" onClick={() => beginEdit(r)}>
-                      {t('common.edit')}
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => void copyUrl(r)}
+                      title={t('paths.actions.copyUrl')}
+                      ariaLabel={t('paths.actions.copyUrl')}
+                    >
+                      <IconCopy className="h-4 w-4" />
                     </Button>
-                    <Button variant="secondary" size="sm" onClick={() => beginDuplicate(r)}>
-                      Duplicar
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => beginEdit(r)}
+                      title={t('common.edit')}
+                      ariaLabel={t('common.edit')}
+                    >
+                      <IconEdit className="h-4 w-4" />
                     </Button>
-                    <Button variant="danger" size="sm" onClick={() => askDelete(r)} disabled={del.isPending}>
-                      {t('common.delete')}
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => beginDuplicate(r)}
+                      title={t('paths.actions.duplicate')}
+                      ariaLabel={t('paths.actions.duplicate')}
+                    >
+                      <IconDuplicate className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="danger"
+                      size="icon"
+                      onClick={() => askDelete(r)}
+                      disabled={del.isPending}
+                      title={t('common.delete')}
+                      ariaLabel={t('common.delete')}
+                    >
+                      <IconTrash className="h-4 w-4" />
                     </Button>
                   </div>
                 ),
@@ -363,14 +501,42 @@ export default function PathsPage() {
                 <div className="text-sm font-medium text-white/90">{r.publicPath}</div>
                 <div className="text-xs text-white/60 break-words">{r.targetUrlTemplate}</div>
                 <div className="mt-2 flex items-center gap-2">
-                  <Button variant="secondary" size="sm" onClick={() => beginEdit(r)}>
-                    {t('common.edit')}
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => void copyUrl(r)}
+                    title={t('paths.actions.copyUrl')}
+                    ariaLabel={t('paths.actions.copyUrl')}
+                  >
+                    <IconCopy className="h-4 w-4" />
                   </Button>
-                  <Button variant="secondary" size="sm" onClick={() => beginDuplicate(r)}>
-                    Duplicar
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => beginEdit(r)}
+                    title={t('common.edit')}
+                    ariaLabel={t('common.edit')}
+                  >
+                    <IconEdit className="h-4 w-4" />
                   </Button>
-                  <Button variant="danger" size="sm" onClick={() => askDelete(r)} disabled={del.isPending}>
-                    {t('common.delete')}
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => beginDuplicate(r)}
+                    title={t('paths.actions.duplicate')}
+                    ariaLabel={t('paths.actions.duplicate')}
+                  >
+                    <IconDuplicate className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="danger"
+                    size="icon"
+                    onClick={() => askDelete(r)}
+                    disabled={del.isPending}
+                    title={t('common.delete')}
+                    ariaLabel={t('common.delete')}
+                  >
+                    <IconTrash className="h-4 w-4" />
                   </Button>
                 </div>
               </div>

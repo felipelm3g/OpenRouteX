@@ -16,7 +16,8 @@ export default function Home() {
             {t('home.badge')}
           </div>
           <h1 className="text-3xl font-semibold tracking-tight text-zinc-50 sm:text-5xl">
-            OpenRouteX
+            <span className="sr-only">OpenRouteX</span>
+            <img src="/logo_OpenRouteX.png" alt="OpenRouteX" className="h-10 w-auto sm:h-12" />
           </h1>
           <p className="max-w-2xl text-base leading-7 text-white/65 sm:text-lg">
             {t('home.subtitle')}

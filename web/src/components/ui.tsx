@@ -115,18 +115,22 @@ export function Button({
   size = 'md',
   disabled,
   type,
+  title,
+  ariaLabel,
 }: {
   children: React.ReactNode;
   onClick?: () => void;
   href?: string;
   variant?: 'primary' | 'secondary' | 'ghost' | 'danger';
-  size?: 'sm' | 'md';
+  size?: 'sm' | 'md' | 'icon';
   disabled?: boolean;
   type?: 'button' | 'submit' | 'reset';
+  title?: string;
+  ariaLabel?: string;
 }) {
   const base =
     'inline-flex items-center justify-center gap-2 rounded-xl font-medium transition focus:outline-none focus:ring-2 focus:ring-[color:var(--accent)]/40 disabled:opacity-60 disabled:pointer-events-none';
-  const sizes = size === 'sm' ? 'h-9 px-3 text-sm' : 'h-10 px-4 text-sm';
+  const sizes = size === 'icon' ? 'h-9 w-9 p-0 text-sm' : size === 'sm' ? 'h-9 px-3 text-sm' : 'h-10 px-4 text-sm';
   const variants =
     variant === 'primary'
       ? 'bg-[linear-gradient(135deg,var(--accent),var(--accent-2))] text-white shadow-[0_8px_20px_rgba(124,58,237,0.20)] hover:brightness-110'
@@ -140,14 +144,14 @@ export function Button({
 
   if (href) {
     return (
-      <Link className={cls} href={href}>
+      <Link className={cls} href={href} title={title} aria-label={ariaLabel}>
         {children}
       </Link>
     );
   }
 
   return (
-    <button className={cls} onClick={onClick} disabled={disabled} type={type}>
+    <button className={cls} onClick={onClick} disabled={disabled} type={type} title={title} aria-label={ariaLabel}>
       {children}
     </button>
   );

@@ -319,6 +319,10 @@
   "paths.form.variablesDetected": "Detected variables: {vars}",
   "paths.table.targetUrl": "Target URL",
   "paths.table.clientAuth": "Require API-KEY",
+  "paths.actions.copyUrl": "Copy URL",
+  "paths.actions.duplicate": "Duplicate",
+  "paths.toast.urlCopied.title": "Copied",
+  "paths.toast.urlCopied.body": "URL copied to clipboard.",
 
   "authentication.title": "Upstream credentials",
   "authentication.subtitle": "Create reusable authentications to apply to routes (OAuth2/OIDC, Bearer, Basic, API Key, Custom Header, HMAC and OAuth1).",
