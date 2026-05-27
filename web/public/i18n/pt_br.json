@@ -371,5 +371,10 @@
   "apiKeys.modal.createTitle": "Criar API Key",
   "apiKeys.modal.editTitle": "Editar API Key",
   "apiKeys.status.active": "ATIVO",
-  "apiKeys.status.disabled": "DESATIVADO"
+  "apiKeys.status.disabled": "DESATIVADO",
+  "apiKeys.actions.copyKey": "Copiar key",
+  "apiKeys.actions.duplicate": "Duplicar",
+  "apiKeys.toast.copied.title": "Copiado",
+  "apiKeys.toast.copied.body": "API Key copiada para a área de transferência.",
+  "apiKeys.toast.copied.fail": "Não foi possível copiar. Copie manualmente no modo de edição."
 }

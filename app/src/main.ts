@@ -1,11 +1,80 @@
 import { readFileSync } from 'fs';
 
-import { ValidationPipe } from '@nestjs/common';
+import { ArgumentsHost, Catch, ExceptionFilter, HttpException, HttpStatus, ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { json, raw, urlencoded } from 'body-parser';
 import Redis from 'ioredis';
+import { QueryFailedError } from 'typeorm';
 
 import { AppModule } from './app.module';
+
+@Catch()
+class GlobalExceptionFilter implements ExceptionFilter {
+  catch(exception: unknown, host: ArgumentsHost) {
+    const ctx = host.switchToHttp();
+    const res: any = ctx.getResponse();
+
+    const send = (status: number, body: any) => {
+      if (!res || typeof res.status !== 'function') return;
+      res.status(status).json(body);
+    };
+
+    if (exception instanceof HttpException) {
+      const ex = exception as HttpException;
+      const status = ex.getStatus();
+      const resp = ex.getResponse();
+      if (typeof resp === 'string') return send(status, { error: 'http_error', message: resp });
+      if (resp && typeof resp === 'object') return send(status, resp);
+      return send(status, { error: 'http_error', message: 'Falha' });
+    }
+
+    if (exception instanceof QueryFailedError) {
+      const driver: any = (exception as any).driverError ?? exception;
+      const code = String(driver?.code ?? '');
+
+      if (code === '23505') {
+        const detail = String(driver?.detail ?? '');
+        const m = /Key\s+\(([^)]+)\)=\(([^)]+)\)\s+already exists/i.exec(detail);
+        const field = (m?.[1] ?? '').trim();
+        const value = (m?.[2] ?? '').trim();
+
+        const msg =
+          field === 'key'
+            ? 'API Key já existe.'
+            : field === 'slug'
+              ? 'Slug já existe.'
+              : field === 'email'
+                ? 'Email já cadastrado.'
+                : field === 'username'
+                  ? 'Usuário já existe.'
+                  : field && field.includes('publicPath') && field.includes('method')
+                    ? 'Já existe uma rota com este método e path para este serviço.'
+                    : field
+                      ? `Valor já existe para ${field}${value ? `: ${value}` : ''}.`
+                      : 'Registro duplicado.';
+
+        return send(HttpStatus.CONFLICT, { error: 'conflict', message: msg });
+      }
+
+      if (code === '23503') {
+        return send(HttpStatus.BAD_REQUEST, {
+          error: 'constraint',
+          message: 'Não foi possível concluir a operação: o registro está em uso por outro recurso.',
+        });
+      }
+
+      if (code === '22P02') {
+        return send(HttpStatus.BAD_REQUEST, { error: 'invalid', message: 'Valor inválido.' });
+      }
+
+      if (code === '23502') {
+        return send(HttpStatus.BAD_REQUEST, { error: 'invalid', message: 'Campo obrigatório ausente.' });
+      }
+    }
+
+    return send(HttpStatus.INTERNAL_SERVER_ERROR, { error: 'internal', message: 'Internal server error' });
+  }
+}
 
 async function bootstrap() {
   const safeOrigin = (value: string) => {
@@ -157,6 +226,8 @@ async function bootstrap() {
       transform: true,
     }),
   );
+
+  app.useGlobalFilters(new GlobalExceptionFilter());
 
   app.use(
     '/admin',

@@ -33,16 +33,22 @@ function maskKey(key: string) {
 }
 
 function parseJsonRecord(txt: string): Record<string, string> {
+  const raw = txt.trim();
+  if (!raw) return {};
   try {
-    const v: unknown = JSON.parse(txt);
-    if (!v || typeof v !== 'object' || Array.isArray(v)) return {};
+    const v: unknown = JSON.parse(raw);
+    if (!v || typeof v !== 'object' || Array.isArray(v)) {
+      throw new Error('JSON inválido.');
+    }
     const out: Record<string, string> = {};
     for (const [k, val] of Object.entries(v as Record<string, unknown>)) {
       out[String(k)] = String(val);
     }
     return out;
-  } catch {
-    return {};
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e);
+    const base = 'JSON inválido em Variáveis. Verifique a sintaxe.';
+    throw new Error(msg && msg !== 'Unexpected end of JSON input' ? `${base}\n\nDetalhe: ${msg}` : base);
   }
 }
 
@@ -72,6 +78,40 @@ const IconTrash = ({ className }: { className?: string }) => (
     <path d="M10 11v6M14 11v6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
     <path d="M6 7l1 14h10l1-14" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" />
     <path d="M9 7V4h6v3" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" />
+  </svg>
+);
+
+const IconCopy = ({ className }: { className?: string }) => (
+  <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden="true">
+    <path
+      d="M8 7a3 3 0 0 1 3-3h7a3 3 0 0 1 3 3v8a3 3 0 0 1-3 3h-1"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+    />
+    <path
+      d="M6 20h8a3 3 0 0 0 3-3V10a3 3 0 0 0-3-3H6a3 3 0 0 0-3 3v7a3 3 0 0 0 3 3Z"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinejoin="round"
+    />
+  </svg>
+);
+
+const IconDuplicate = ({ className }: { className?: string }) => (
+  <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden="true">
+    <path
+      d="M8 8h10a3 3 0 0 1 3 3v8a3 3 0 0 1-3 3H8a3 3 0 0 1-3-3V11a3 3 0 0 1 3-3Z"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinejoin="round"
+    />
+    <path
+      d="M16 8V7a3 3 0 0 0-3-3H6a3 3 0 0 0-3 3v8a3 3 0 0 0 3 3h1"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+    />
   </svg>
 );
 
@@ -135,6 +175,44 @@ export default function ApiKeysPage() {
     setBindingsText(JSON.stringify(k.variableBindings ?? {}, null, 2));
     setOpen(true);
   }, []);
+
+  const beginDuplicate = useCallback((k: ApiKey) => {
+    setEditing(null);
+    setName(`Cópia de ${k.name}`);
+    setKey('');
+    setStatus(k.status);
+    setRpm(String(k.requestsPerMinute ?? 60));
+    setAllowedApis(k.allowedApis ?? []);
+    setBindingsText(JSON.stringify(k.variableBindings ?? {}, null, 2));
+    setOpen(true);
+  }, []);
+
+  const copyApiKey = useCallback(async (k: ApiKey) => {
+    const value = String(k.key ?? '').trim();
+    if (!value) return;
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(value);
+        toast.success(t('apiKeys.toast.copied.title'), t('apiKeys.toast.copied.body'));
+        return;
+      }
+    } catch {
+    }
+    try {
+      const el = document.createElement('textarea');
+      el.value = value;
+      el.setAttribute('readonly', 'true');
+      el.style.position = 'fixed';
+      el.style.left = '-9999px';
+      document.body.appendChild(el);
+      el.select();
+      document.execCommand('copy');
+      el.remove();
+      toast.success(t('apiKeys.toast.copied.title'), t('apiKeys.toast.copied.body'));
+    } catch {
+      toast.error(t('common.failure'), t('apiKeys.toast.copied.fail'));
+    }
+  }, [t, toast]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -246,11 +324,29 @@ export default function ApiKeysPage() {
                     <Button
                       variant="ghost"
                       size="icon"
+                      onClick={() => void copyApiKey(r)}
+                      title={t('apiKeys.actions.copyKey')}
+                      ariaLabel={t('apiKeys.actions.copyKey')}
+                    >
+                      <IconCopy className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
                       onClick={() => beginEdit(r)}
                       title={t('common.edit')}
                       ariaLabel={t('common.edit')}
                     >
                       <IconEdit className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => beginDuplicate(r)}
+                      title={t('apiKeys.actions.duplicate')}
+                      ariaLabel={t('apiKeys.actions.duplicate')}
+                    >
+                      <IconDuplicate className="h-4 w-4" />
                     </Button>
                     <Button
                       variant="danger"
