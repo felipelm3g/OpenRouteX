@@ -364,15 +364,15 @@ export default function DashboardPage() {
     if (ms === null || ms === undefined) return base;
     if (!Number.isFinite(ms)) return base;
     if (ms < 2000) return base;
-    if (ms < 5000) return 'text-amber-200';
-    return 'text-rose-200';
+    if (ms < 5000) return 'text-amber-300';
+    return 'text-rose-400';
   };
 
   const countTextClass = (n: number, kind: 'success' | 'error') => {
     const base = 'text-white/80';
     if (!colorize) return base;
     if (n <= 0) return base;
-    return kind === 'success' ? 'text-emerald-200' : 'text-rose-200';
+    return kind === 'success' ? 'text-emerald-400' : 'text-rose-400';
   };
 
   const latencyUnitLabel = latencyUnit === 'ms' ? 'ms' : 's';
