@@ -14,6 +14,15 @@ import { detectVariables, detectVariablesInRecord } from '@/lib/vars';
 type Api = { id: string; name: string; slug: string };
 type Auth = { id: string; name: string; type: string };
 type SettingsDto = { defaultForwardClientQuery: boolean; proxyTimeoutMs: number };
+type AuthType =
+  | 'api_key'
+  | 'oauth2_client_credentials'
+  | 'oidc_client_credentials'
+  | 'bearer'
+  | 'basic'
+  | 'custom_header'
+  | 'hmac'
+  | 'oauth1';
 type Path = {
   id: string;
   apiId: string;
@@ -22,6 +31,8 @@ type Path = {
   method: string;
   targetUrlTemplate: string;
   authId: string | null;
+  authInlineType?: string | null;
+  authInlineConfig?: Record<string, unknown> | null;
   enabled: boolean;
   requireClientAuth: boolean;
   addHeaders: Record<string, string>;
@@ -30,6 +41,54 @@ type Path = {
   timeoutSeconds: number | null;
   createdAt: string;
 };
+
+function defaultAuthConfig(t: AuthType): Record<string, unknown> {
+  if (t === 'api_key') return { headerName: 'X-API-KEY', value: '' };
+  if (t === 'bearer') return { token: '' };
+  if (t === 'basic') return { username: '', password: '' };
+  if (t === 'custom_header') return { headerName: 'X-CUSTOM', value: '' };
+  if (t === 'oidc_client_credentials') {
+    return {
+      issuerUrl: '',
+      tokenUrl: '',
+      clientId: '',
+      clientSecret: '',
+      scope: '',
+      audience: '',
+      authStyle: 'basic',
+    };
+  }
+  if (t === 'hmac') {
+    return {
+      headerName: 'Authorization',
+      keyId: '',
+      secret: '',
+      algorithm: 'sha256',
+      signatureEncoding: 'hex',
+      timestampHeaderName: '',
+      nonceHeaderName: '',
+      stringToSignTemplate: '{method}\n{path}\n{query}\n{body_sha256}\n{timestamp}',
+      headerValueTemplate: 'HMAC {keyId}:{signature}',
+    };
+  }
+  if (t === 'oauth1') {
+    return {
+      consumerKey: '',
+      consumerSecret: '',
+      token: '',
+      tokenSecret: '',
+      realm: '',
+    };
+  }
+  return {
+    tokenUrl: '',
+    clientId: '',
+    clientSecret: '',
+    scope: '',
+    audience: '',
+    authStyle: 'basic',
+  };
+}
 
 function errorMessage(e: unknown) {
   if (!e || typeof e !== 'object') return 'Falha';
@@ -88,7 +147,9 @@ export default function PathsPage() {
   const [publicPath, setPublicPath] = useState('/dados');
   const [method, setMethod] = useState('GET');
   const [targetUrlTemplate, setTargetUrlTemplate] = useState('https://external.com/{CONTA}/dados');
-  const [authId, setAuthId] = useState<string>('');
+  const [authUpstream, setAuthUpstream] = useState<string>('none');
+  const [authCustomType, setAuthCustomType] = useState<AuthType>('bearer');
+  const [authCustomConfig, setAuthCustomConfig] = useState<Record<string, unknown>>(defaultAuthConfig('bearer'));
   const [enabled, setEnabled] = useState(true);
   const [requireClientAuth, setRequireClientAuth] = useState(true);
   const [forwardClientQuery, setForwardClientQuery] = useState(true);
@@ -210,8 +271,13 @@ export default function PathsPage() {
     const fromTarget = detectVariables(targetUrlTemplate);
     const fromHeaders = detectVariablesInRecord(parsedAdds.headers);
     const fromQuery = detectVariablesInRecord(parsedAdds.query);
-    return Array.from(new Set([...fromTarget, ...fromHeaders, ...fromQuery])).sort();
-  }, [parsedAdds.headers, parsedAdds.query, targetUrlTemplate]);
+    const authConfigStrings: Record<string, string> = {};
+    for (const [k, v] of Object.entries(authCustomConfig ?? {})) {
+      if (typeof v === 'string') authConfigStrings[String(k)] = v;
+    }
+    const fromAuth = authUpstream === 'custom' ? detectVariablesInRecord(authConfigStrings) : [];
+    return Array.from(new Set([...fromTarget, ...fromHeaders, ...fromQuery, ...fromAuth])).sort();
+  }, [authCustomConfig, authUpstream, parsedAdds.headers, parsedAdds.query, targetUrlTemplate]);
 
   const insertPublicPathSnippet = useCallback(
     (snippet: string, selection?: { start: number; end: number }) => {
@@ -241,7 +307,9 @@ export default function PathsPage() {
     setPublicPath('/dados');
     setMethod('GET');
     setTargetUrlTemplate('https://external.com/{CONTA}/dados');
-    setAuthId('');
+    setAuthUpstream('none');
+    setAuthCustomType('bearer');
+    setAuthCustomConfig(defaultAuthConfig('bearer'));
     setEnabled(true);
     setRequireClientAuth(true);
     setForwardClientQuery(defaultForward);
@@ -262,7 +330,15 @@ export default function PathsPage() {
     setPublicPath(p.publicPath);
     setMethod(p.method);
     setTargetUrlTemplate(p.targetUrlTemplate);
-    setAuthId(p.authId ?? '');
+    if (p.authInlineType) {
+      setAuthUpstream('custom');
+      setAuthCustomType(p.authInlineType as AuthType);
+      setAuthCustomConfig((p.authInlineConfig as Record<string, unknown>) ?? defaultAuthConfig(p.authInlineType as AuthType));
+    } else {
+      setAuthUpstream(p.authId ?? 'none');
+      setAuthCustomType('bearer');
+      setAuthCustomConfig(defaultAuthConfig('bearer'));
+    }
     setEnabled(Boolean(p.enabled));
     setRequireClientAuth(p.requireClientAuth !== false);
     setForwardClientQuery(p.forwardClientQuery !== false);
@@ -279,7 +355,15 @@ export default function PathsPage() {
     setPublicPath(p.publicPath);
     setMethod(p.method);
     setTargetUrlTemplate(p.targetUrlTemplate);
-    setAuthId(p.authId ?? '');
+    if (p.authInlineType) {
+      setAuthUpstream('custom');
+      setAuthCustomType(p.authInlineType as AuthType);
+      setAuthCustomConfig((p.authInlineConfig as Record<string, unknown>) ?? defaultAuthConfig(p.authInlineType as AuthType));
+    } else {
+      setAuthUpstream(p.authId ?? 'none');
+      setAuthCustomType('bearer');
+      setAuthCustomConfig(defaultAuthConfig('bearer'));
+    }
     setEnabled(Boolean(p.enabled));
     setRequireClientAuth(p.requireClientAuth !== false);
     setForwardClientQuery(p.forwardClientQuery !== false);
@@ -312,13 +396,26 @@ export default function PathsPage() {
 
   const save = useMutation({
     mutationFn: async () => {
+      const authId = authUpstream && authUpstream !== 'none' && authUpstream !== 'custom' ? authUpstream : null;
+      const authInlineType = authUpstream === 'custom' ? authCustomType : null;
+      const authInlineConfig = authUpstream === 'custom' ? authCustomConfig : null;
+      const normalizedPublicPath = (() => {
+        const s = String(publicPath ?? '').trim();
+        if (!s) return '/';
+        const withLeading = s.startsWith('/') ? s : `/${s}`;
+        const noTrailing = withLeading.replace(/\/+$/, '');
+        return noTrailing || '/';
+      })();
+      if (normalizedPublicPath !== publicPath) setPublicPath(normalizedPublicPath);
       const payload = {
         apiId,
         name,
-        publicPath,
+        publicPath: normalizedPublicPath,
         method,
         targetUrlTemplate,
-        authId: authId || null,
+        authId,
+        authInlineType,
+        authInlineConfig,
         enabled,
         requireClientAuth,
         addHeaders: parsedAdds.headers,
@@ -602,6 +699,7 @@ export default function PathsPage() {
         open={open}
         onClose={() => setOpen(false)}
         title={editing ? t('paths.modal.editTitle') : t('paths.modal.createTitle')}
+        size="full"
         footer={
           <div className="flex items-center justify-end gap-2">
             <Button variant="secondary" onClick={() => setOpen(false)}>
@@ -633,6 +731,7 @@ export default function PathsPage() {
                 value={method}
                 onChange={setMethod}
                 options={[
+                  { value: 'ANY', label: 'ORIGEM' },
                   { value: 'GET', label: 'GET' },
                   { value: 'POST', label: 'POST' },
                   { value: 'PUT', label: 'PUT' },
@@ -686,15 +785,291 @@ export default function PathsPage() {
             <div className="text-xs font-medium text-white/70">{t('paths.form.auth')}</div>
             <div className="mt-2">
               <Select
-                value={authId || 'none'}
-                onChange={(v) => setAuthId(v === 'none' ? '' : v)}
+                value={authUpstream || 'none'}
+                onChange={(v) => {
+                  if (v === 'custom') {
+                    setAuthUpstream('custom');
+                    setAuthCustomType('bearer');
+                    setAuthCustomConfig(defaultAuthConfig('bearer'));
+                    return;
+                  }
+                  setAuthUpstream(v === 'none' ? 'none' : v);
+                }}
                 options={[
                   { value: 'none', label: t('paths.form.none') },
+                  { value: 'custom', label: 'Customizada' },
                   ...auths.map((a: Auth) => ({ value: a.id, label: `${a.name} (${a.type})` })),
                 ]}
               />
             </div>
           </div>
+
+          {authUpstream === 'custom' ? (
+            <div className="sm:col-span-2 rounded-2xl border border-white/10 bg-white/5 p-4">
+              <div className="text-xs font-medium text-white/70">Credencial customizada</div>
+              <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                <div className="sm:col-span-2">
+                  <div className="text-xs font-medium text-white/70">Tipo</div>
+                  <div className="mt-2">
+                    <Select
+                      value={authCustomType}
+                      onChange={(v) => {
+                        const next = v as AuthType;
+                        setAuthCustomType(next);
+                        setAuthCustomConfig(defaultAuthConfig(next));
+                      }}
+                      options={[
+                        { value: 'bearer', label: 'Bearer' },
+                        { value: 'basic', label: 'Basic' },
+                        { value: 'api_key', label: 'API Key' },
+                        { value: 'custom_header', label: 'Custom Header' },
+                        { value: 'oauth2_client_credentials', label: 'OAuth2 Client Credentials' },
+                        { value: 'oidc_client_credentials', label: 'OIDC Client Credentials' },
+                        { value: 'hmac', label: 'HMAC' },
+                        { value: 'oauth1', label: 'OAuth1' },
+                      ]}
+                    />
+                  </div>
+                </div>
+
+                {authCustomType === 'bearer' ? (
+                  <AuthField
+                    label="token"
+                    value={String(authCustomConfig.token ?? '')}
+                    onChange={(v) => setAuthCustomConfig((p) => ({ ...p, token: v }))}
+                  />
+                ) : null}
+
+                {authCustomType === 'basic' ? (
+                  <>
+                    <AuthField
+                      label="username"
+                      value={String(authCustomConfig.username ?? '')}
+                      onChange={(v) => setAuthCustomConfig((p) => ({ ...p, username: v }))}
+                    />
+                    <AuthField
+                      label="password"
+                      value={String(authCustomConfig.password ?? '')}
+                      onChange={(v) => setAuthCustomConfig((p) => ({ ...p, password: v }))}
+                      type="password"
+                    />
+                  </>
+                ) : null}
+
+                {authCustomType === 'api_key' || authCustomType === 'custom_header' ? (
+                  <>
+                    <AuthField
+                      label="headerName"
+                      value={String(authCustomConfig.headerName ?? '')}
+                      onChange={(v) => setAuthCustomConfig((p) => ({ ...p, headerName: v }))}
+                    />
+                    <AuthField
+                      label="value"
+                      value={String(authCustomConfig.value ?? '')}
+                      onChange={(v) => setAuthCustomConfig((p) => ({ ...p, value: v }))}
+                    />
+                  </>
+                ) : null}
+
+                {authCustomType === 'oauth2_client_credentials' ? (
+                  <>
+                    <AuthField
+                      label="tokenUrl"
+                      value={String(authCustomConfig.tokenUrl ?? '')}
+                      onChange={(v) => setAuthCustomConfig((p) => ({ ...p, tokenUrl: v }))}
+                    />
+                    <AuthField
+                      label="clientId"
+                      value={String(authCustomConfig.clientId ?? '')}
+                      onChange={(v) => setAuthCustomConfig((p) => ({ ...p, clientId: v }))}
+                    />
+                    <AuthField
+                      label="clientSecret"
+                      value={String(authCustomConfig.clientSecret ?? '')}
+                      onChange={(v) => setAuthCustomConfig((p) => ({ ...p, clientSecret: v }))}
+                      type="password"
+                    />
+                    <AuthField
+                      label="scope"
+                      value={String(authCustomConfig.scope ?? '')}
+                      onChange={(v) => setAuthCustomConfig((p) => ({ ...p, scope: v }))}
+                    />
+                    <AuthField
+                      label="audience"
+                      value={String(authCustomConfig.audience ?? '')}
+                      onChange={(v) => setAuthCustomConfig((p) => ({ ...p, audience: v }))}
+                    />
+                    <div className="sm:col-span-2">
+                      <div className="mt-1 text-xs text-white/55">
+                        authStyle: basic (Authorization header) ou body (client_id/client_secret no body).
+                      </div>
+                      <div className="mt-2">
+                        <Select
+                          value={String(authCustomConfig.authStyle ?? 'basic')}
+                          onChange={(v) => setAuthCustomConfig((p) => ({ ...p, authStyle: v }))}
+                          options={[
+                            { value: 'basic', label: 'basic' },
+                            { value: 'body', label: 'body' },
+                          ]}
+                        />
+                      </div>
+                    </div>
+                  </>
+                ) : null}
+
+                {authCustomType === 'oidc_client_credentials' ? (
+                  <>
+                    <AuthField
+                      label="issuerUrl"
+                      value={String(authCustomConfig.issuerUrl ?? '')}
+                      onChange={(v) => setAuthCustomConfig((p) => ({ ...p, issuerUrl: v }))}
+                    />
+                    <AuthField
+                      label="tokenUrl (opcional)"
+                      value={String(authCustomConfig.tokenUrl ?? '')}
+                      onChange={(v) => setAuthCustomConfig((p) => ({ ...p, tokenUrl: v }))}
+                    />
+                    <AuthField
+                      label="clientId"
+                      value={String(authCustomConfig.clientId ?? '')}
+                      onChange={(v) => setAuthCustomConfig((p) => ({ ...p, clientId: v }))}
+                    />
+                    <AuthField
+                      label="clientSecret"
+                      value={String(authCustomConfig.clientSecret ?? '')}
+                      onChange={(v) => setAuthCustomConfig((p) => ({ ...p, clientSecret: v }))}
+                      type="password"
+                    />
+                    <AuthField
+                      label="scope"
+                      value={String(authCustomConfig.scope ?? '')}
+                      onChange={(v) => setAuthCustomConfig((p) => ({ ...p, scope: v }))}
+                    />
+                    <AuthField
+                      label="audience"
+                      value={String(authCustomConfig.audience ?? '')}
+                      onChange={(v) => setAuthCustomConfig((p) => ({ ...p, audience: v }))}
+                    />
+                    <div className="sm:col-span-2">
+                      <div className="mt-1 text-xs text-white/55">
+                        authStyle: basic (Authorization header) ou body (client_id/client_secret no body).
+                      </div>
+                      <div className="mt-2">
+                        <Select
+                          value={String(authCustomConfig.authStyle ?? 'basic')}
+                          onChange={(v) => setAuthCustomConfig((p) => ({ ...p, authStyle: v }))}
+                          options={[
+                            { value: 'basic', label: 'basic' },
+                            { value: 'body', label: 'body' },
+                          ]}
+                        />
+                      </div>
+                    </div>
+                  </>
+                ) : null}
+
+                {authCustomType === 'hmac' ? (
+                  <>
+                    <AuthField
+                      label="headerName"
+                      value={String(authCustomConfig.headerName ?? '')}
+                      onChange={(v) => setAuthCustomConfig((p) => ({ ...p, headerName: v }))}
+                    />
+                    <AuthField
+                      label="keyId"
+                      value={String(authCustomConfig.keyId ?? '')}
+                      onChange={(v) => setAuthCustomConfig((p) => ({ ...p, keyId: v }))}
+                    />
+                    <AuthField
+                      label="secret"
+                      value={String(authCustomConfig.secret ?? '')}
+                      onChange={(v) => setAuthCustomConfig((p) => ({ ...p, secret: v }))}
+                      type="password"
+                    />
+                    <div>
+                      <div className="text-xs font-medium text-white/70">algorithm</div>
+                      <div className="mt-2">
+                        <Select
+                          value={String(authCustomConfig.algorithm ?? 'sha256')}
+                          onChange={(v) => setAuthCustomConfig((p) => ({ ...p, algorithm: v }))}
+                          options={[
+                            { value: 'sha256', label: 'sha256' },
+                            { value: 'sha1', label: 'sha1' },
+                            { value: 'sha512', label: 'sha512' },
+                          ]}
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-xs font-medium text-white/70">signatureEncoding</div>
+                      <div className="mt-2">
+                        <Select
+                          value={String(authCustomConfig.signatureEncoding ?? 'hex')}
+                          onChange={(v) => setAuthCustomConfig((p) => ({ ...p, signatureEncoding: v }))}
+                          options={[
+                            { value: 'hex', label: 'hex' },
+                            { value: 'base64', label: 'base64' },
+                          ]}
+                        />
+                      </div>
+                    </div>
+                    <AuthField
+                      label="timestampHeaderName (opcional)"
+                      value={String(authCustomConfig.timestampHeaderName ?? '')}
+                      onChange={(v) => setAuthCustomConfig((p) => ({ ...p, timestampHeaderName: v }))}
+                    />
+                    <AuthField
+                      label="nonceHeaderName (opcional)"
+                      value={String(authCustomConfig.nonceHeaderName ?? '')}
+                      onChange={(v) => setAuthCustomConfig((p) => ({ ...p, nonceHeaderName: v }))}
+                    />
+                    <AuthField
+                      label="stringToSignTemplate"
+                      value={String(authCustomConfig.stringToSignTemplate ?? '')}
+                      onChange={(v) => setAuthCustomConfig((p) => ({ ...p, stringToSignTemplate: v }))}
+                    />
+                    <AuthField
+                      label="headerValueTemplate"
+                      value={String(authCustomConfig.headerValueTemplate ?? '')}
+                      onChange={(v) => setAuthCustomConfig((p) => ({ ...p, headerValueTemplate: v }))}
+                    />
+                  </>
+                ) : null}
+
+                {authCustomType === 'oauth1' ? (
+                  <>
+                    <AuthField
+                      label="consumerKey"
+                      value={String(authCustomConfig.consumerKey ?? '')}
+                      onChange={(v) => setAuthCustomConfig((p) => ({ ...p, consumerKey: v }))}
+                    />
+                    <AuthField
+                      label="consumerSecret"
+                      value={String(authCustomConfig.consumerSecret ?? '')}
+                      onChange={(v) => setAuthCustomConfig((p) => ({ ...p, consumerSecret: v }))}
+                      type="password"
+                    />
+                    <AuthField
+                      label="token (opcional)"
+                      value={String(authCustomConfig.token ?? '')}
+                      onChange={(v) => setAuthCustomConfig((p) => ({ ...p, token: v }))}
+                    />
+                    <AuthField
+                      label="tokenSecret (opcional)"
+                      value={String(authCustomConfig.tokenSecret ?? '')}
+                      onChange={(v) => setAuthCustomConfig((p) => ({ ...p, tokenSecret: v }))}
+                      type="password"
+                    />
+                    <AuthField
+                      label="realm (opcional)"
+                      value={String(authCustomConfig.realm ?? '')}
+                      onChange={(v) => setAuthCustomConfig((p) => ({ ...p, realm: v }))}
+                    />
+                  </>
+                ) : null}
+              </div>
+            </div>
+          ) : null}
 
           <div className="sm:col-span-2 grid gap-3 sm:grid-cols-3">
             <div>
@@ -806,5 +1181,26 @@ export default function PathsPage() {
         {confirm?.details ?? null}
       </ConfirmModal>
     </PageShell>
+  );
+}
+
+function AuthField({
+  label,
+  value,
+  onChange,
+  type = 'text',
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  type?: string;
+}) {
+  return (
+    <div>
+      <div className="text-xs font-medium text-white/70">{label}</div>
+      <div className="mt-2">
+        <TextInput value={value} onChange={onChange} placeholder={label} type={type} />
+      </div>
+    </div>
   );
 }

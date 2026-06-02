@@ -31,7 +31,7 @@ export class VariableResolverService {
       const resolved = bindings[varName];
       if (resolved === undefined) {
         throw new BadRequestException(
-          `Variável ${full} não definida para esta API Key`,
+          `Variável ${full} não definida para esta requisição`,
         );
       }
       return resolved;
@@ -55,4 +55,3 @@ export class VariableResolverService {
     return { value: out, variablesUsed: Array.from(variablesUsed).sort() };
   }
 }
-

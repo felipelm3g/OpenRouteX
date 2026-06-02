@@ -244,13 +244,14 @@ export default function ApiKeysPage() {
         throw new Error('Chave inválida. Use apenas letras, números e . _ - ~ (sem espaços).');
       }
       if (!name.trim()) throw new Error('Nome é obrigatório.');
+      if (!allowedApis.length) throw new Error('Selecione ao menos 1 API permitida.');
 
       const payload = {
         name: name.trim(),
         key: normalizedKey,
         status,
         requestsPerMinute: Number(rpm),
-        allowedApis: allowedApis.length ? allowedApis : null,
+        allowedApis,
         variableBindings: parseJsonRecord(bindingsText),
       };
       if (editing) {
@@ -371,6 +372,7 @@ export default function ApiKeysPage() {
         open={open}
         onClose={() => setOpen(false)}
         title={editing ? t('apiKeys.modal.editTitle') : t('apiKeys.modal.createTitle')}
+        size="full"
         footer={
           <div className="flex items-center justify-end gap-2">
             <Button variant="secondary" onClick={() => setOpen(false)}>
@@ -424,18 +426,25 @@ export default function ApiKeysPage() {
           <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
             <div className="text-xs font-medium text-white/70">APIs permitidas</div>
             <div className="mt-2 text-xs text-white/55">
-              Selecione quais APIs este API Key pode chamar. Se não selecionar nenhuma, ele pode chamar todas.
+              Selecione quais APIs este API Key pode chamar. É obrigatório selecionar ao menos 1.
             </div>
             <div className="mt-3 flex items-center gap-2">
               <button
                 type="button"
                 className="inline-flex h-9 items-center justify-center rounded-xl border border-white/12 bg-white/5 px-3 text-xs font-medium text-white/80 hover:bg-white/10"
+                onClick={() => setAllowedApis(apis.map((a: Api) => a.slug))}
+              >
+                Selecionar todas
+              </button>
+              <button
+                type="button"
+                className="inline-flex h-9 items-center justify-center rounded-xl border border-white/12 bg-white/5 px-3 text-xs font-medium text-white/80 hover:bg-white/10"
                 onClick={() => setAllowedApis([])}
               >
-                Permitir todas
+                Limpar seleção
               </button>
               <div className="text-xs text-white/55">
-                {allowedApis.length ? `${allowedApis.length} selecionadas` : 'todas'}
+                {allowedApis.length ? `${allowedApis.length} selecionadas` : 'nenhuma'}
               </div>
             </div>
             <div className="mt-3 max-h-44 overflow-y-auto rounded-xl border border-white/10 bg-black/10 p-2">

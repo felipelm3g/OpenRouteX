@@ -299,6 +299,7 @@ export default function CertificatesPage() {
         open={open}
         onClose={() => setOpen(false)}
         title={editing ? t('certificates.modal.editTitle') : t('certificates.modal.createTitle')}
+        size="full"
         footer={
           <div className="flex items-center justify-end gap-2">
             <Button variant="secondary" onClick={() => setOpen(false)}>

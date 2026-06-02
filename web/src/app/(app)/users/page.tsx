@@ -575,6 +575,7 @@ export default function UsersPage() {
         open={open}
         onClose={() => setOpen(false)}
         title={editing ? t('users.editTitle') : t('users.createTitle')}
+        size="full"
         footer={
           <div className="flex items-center justify-end gap-2">
             <Button variant="secondary" onClick={() => setOpen(false)}>
@@ -705,6 +706,7 @@ export default function UsersPage() {
           setPermUser(null);
         }}
         title={t('common.permissions')}
+        size="full"
         footer={
           <div className="flex items-center justify-end gap-2">
             <Button

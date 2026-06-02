@@ -299,6 +299,7 @@ export default function AuthenticationPage() {
         open={open}
         onClose={() => setOpen(false)}
         title={editing ? t('authentication.modal.editTitle') : t('authentication.modal.createTitle')}
+        size="full"
         footer={
           <div className="flex items-center justify-end gap-2">
             <Button variant="secondary" onClick={() => setOpen(false)}>

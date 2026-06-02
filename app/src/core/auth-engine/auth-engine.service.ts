@@ -1,6 +1,6 @@
 import { createHash, createHmac, randomBytes } from 'crypto';
 
-import { Injectable } from '@nestjs/common';
+import { HttpException, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
 import { AuthEntity, AuthType } from '../../modules/auth/auth.entity';
@@ -36,6 +36,23 @@ export class AuthEngineService {
   private oauth1Enc(value: string) {
     return encodeURIComponent(String(value ?? ''))
       .replace(/[!'()*]/g, (c) => `%${c.charCodeAt(0).toString(16).toUpperCase()}`);
+  }
+
+  private parseJsonSafe(buf: Buffer): any | null {
+    const text = buf.toString('utf8').trim();
+    if (!text) return null;
+    try {
+      return JSON.parse(text);
+    } catch {
+      return null;
+    }
+  }
+
+  private bodyPreview(buf: Buffer, limit = 600) {
+    const s = buf.toString('utf8');
+    const trimmed = s.trim();
+    if (trimmed.length <= limit) return trimmed;
+    return `${trimmed.slice(0, limit)}…`;
   }
 
   private buildOAuth1AuthorizationHeader(params: {
@@ -199,7 +216,22 @@ export class AuthEngineService {
         timeoutMs,
       });
 
-      const json = JSON.parse(response.body.toString('utf8')) as any;
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        const jsonErr = this.parseJsonSafe(response.body);
+        const msg = jsonErr?.error_description || jsonErr?.error || this.bodyPreview(response.body) || 'oauth2_token_failed';
+        throw new HttpException(
+          { error: 'oauth2_token_failed', statusCode: response.statusCode, message: String(msg) },
+          502,
+        );
+      }
+
+      const json = this.parseJsonSafe(response.body) as any;
+      if (!json) {
+        throw new HttpException(
+          { error: 'oauth2_token_invalid_response', statusCode: response.statusCode, message: this.bodyPreview(response.body) || 'invalid_json' },
+          502,
+        );
+      }
       const accessToken = String(json?.access_token ?? '');
       const expiresIn = Number(json?.expires_in ?? 300);
       if (!accessToken) return { headers: {} };
@@ -252,7 +284,22 @@ export class AuthEngineService {
         timeoutMs,
       });
 
-      const json = JSON.parse(response.body.toString('utf8')) as any;
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        const jsonErr = this.parseJsonSafe(response.body);
+        const msg = jsonErr?.error_description || jsonErr?.error || this.bodyPreview(response.body) || 'oidc_token_failed';
+        throw new HttpException(
+          { error: 'oidc_token_failed', statusCode: response.statusCode, message: String(msg) },
+          502,
+        );
+      }
+
+      const json = this.parseJsonSafe(response.body) as any;
+      if (!json) {
+        throw new HttpException(
+          { error: 'oidc_token_invalid_response', statusCode: response.statusCode, message: this.bodyPreview(response.body) || 'invalid_json' },
+          502,
+        );
+      }
       const accessToken = String(json?.access_token ?? '');
       const expiresIn = Number(json?.expires_in ?? 300);
       if (!accessToken) return { headers: {} };

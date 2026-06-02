@@ -15,7 +15,7 @@ export class CreatePathDto {
   publicPath!: string;
 
   @IsString()
-  @IsIn(['GET', 'POST', 'PUT', 'PATCH', 'DELETE'] satisfies HttpMethod[])
+  @IsIn(['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'ANY'] satisfies HttpMethod[])
   method!: HttpMethod;
 
   @IsString()
@@ -25,6 +25,24 @@ export class CreatePathDto {
   @IsOptional()
   @IsUUID()
   authId?: string | null;
+
+  @IsOptional()
+  @IsString()
+  @IsIn([
+    'api_key',
+    'oauth2_client_credentials',
+    'oidc_client_credentials',
+    'bearer',
+    'basic',
+    'custom_header',
+    'hmac',
+    'oauth1',
+  ])
+  authInlineType?: string | null;
+
+  @IsOptional()
+  @IsObject()
+  authInlineConfig?: Record<string, unknown> | null;
 
   @IsOptional()
   @IsBoolean()
@@ -70,7 +88,7 @@ export class UpdatePathDto {
 
   @IsOptional()
   @IsString()
-  @IsIn(['GET', 'POST', 'PUT', 'PATCH', 'DELETE'] satisfies HttpMethod[])
+  @IsIn(['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'ANY'] satisfies HttpMethod[])
   method?: HttpMethod;
 
   @IsOptional()
@@ -81,6 +99,24 @@ export class UpdatePathDto {
   @IsOptional()
   @IsUUID()
   authId?: string | null;
+
+  @IsOptional()
+  @IsString()
+  @IsIn([
+    'api_key',
+    'oauth2_client_credentials',
+    'oidc_client_credentials',
+    'bearer',
+    'basic',
+    'custom_header',
+    'hmac',
+    'oauth1',
+  ])
+  authInlineType?: string | null;
+
+  @IsOptional()
+  @IsObject()
+  authInlineConfig?: Record<string, unknown> | null;
 
   @IsOptional()
   @IsBoolean()

@@ -25,6 +25,9 @@ export class ApiEntity {
   @Column({ type: 'uuid', nullable: true })
   certificateId!: string | null;
 
+  @Column({ type: 'jsonb', default: {} })
+  variableBindings!: Record<string, string>;
+
   @CreateDateColumn({ type: 'timestamptz' })
   createdAt!: Date;
 

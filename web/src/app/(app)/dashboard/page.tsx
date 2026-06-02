@@ -189,7 +189,11 @@ export default function DashboardPage() {
   const logsRefetch = settingsQ.data?.dashboardLogsRefetchMs ?? 2000;
   const colorize = settingsQ.data?.dashboardColorizeEnabled ?? true;
 
-  const [latencyUnit, setLatencyUnit] = useState<LatencyUnit>('ms');
+  const [latencyUnit, setLatencyUnit] = useState<LatencyUnit>(() => {
+    if (typeof window === 'undefined') return 'ms';
+    const raw = String(window.localStorage.getItem('orx:dashboard:latencyUnit') ?? '').trim().toLowerCase();
+    return raw === 's' ? 's' : 'ms';
+  });
   const [api, setApi] = useState('');
   const [path, setPath] = useState('');
   const [status, setStatus] = useState('');
@@ -223,12 +227,6 @@ export default function DashboardPage() {
     if (!v) return;
     const t = setTimeout(() => setOpenFromUrl(v), 0);
     return () => clearTimeout(t);
-  }, []);
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const raw = String(window.localStorage.getItem('orx:dashboard:latencyUnit') ?? '').trim().toLowerCase();
-    if (raw === 'ms' || raw === 's') setLatencyUnit(raw as LatencyUnit);
   }, []);
 
   useEffect(() => {

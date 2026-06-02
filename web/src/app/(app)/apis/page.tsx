@@ -15,6 +15,7 @@ type Api = {
   slug: string;
   description: string | null;
   certificateId?: string | null;
+  variableBindings?: Record<string, string>;
   createdAt: string;
 };
 
@@ -68,6 +69,7 @@ export default function ApisPage() {
   const [slug, setSlug] = useState('');
   const [description, setDescription] = useState('');
   const [certificateId, setCertificateId] = useState('');
+  const [variableBindingsText, setVariableBindingsText] = useState('{}');
   const [confirm, setConfirm] = useState<null | {
     title: string;
     description: string;
@@ -82,6 +84,7 @@ export default function ApisPage() {
     setSlug('');
     setDescription('');
     setCertificateId('');
+    setVariableBindingsText('{}');
   }, []);
 
   const beginCreate = useCallback(() => {
@@ -95,6 +98,7 @@ export default function ApisPage() {
     setSlug(a.slug);
     setDescription(a.description ?? '');
     setCertificateId(a.certificateId ?? '');
+    setVariableBindingsText(JSON.stringify(a.variableBindings ?? {}, null, 2));
     setOpen(true);
   }, []);
 
@@ -122,7 +126,25 @@ export default function ApisPage() {
 
   const save = useMutation({
     mutationFn: async () => {
-      const payload = { name, slug, description: description || null, certificateId: certificateId || null };
+      let parsedVars: Record<string, string> = {};
+      try {
+        const raw: unknown = JSON.parse(variableBindingsText || '{}');
+        if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
+          parsedVars = Object.fromEntries(
+            Object.entries(raw as Record<string, unknown>).map(([k, v]) => [String(k), String(v)]),
+          );
+        }
+      } catch {
+        throw new Error('Variáveis do serviço inválidas. Use um JSON objeto, ex: {"URL":"https://..."}');
+      }
+
+      const payload = {
+        name,
+        slug,
+        description: description || null,
+        certificateId: certificateId || null,
+        variableBindings: parsedVars,
+      };
       if (editing) {
         return apiFetch<Api>(`/admin/apis/${editing.id}`, {
           method: 'PATCH',
@@ -295,6 +317,7 @@ export default function ApisPage() {
         open={open}
         onClose={() => setOpen(false)}
         title={editing ? t('apis.editTitle') : t('apis.createTitle')}
+        size="full"
         footer={
           <div className="flex items-center justify-end gap-2">
             <Button variant="secondary" onClick={() => setOpen(false)}>
@@ -333,6 +356,20 @@ export default function ApisPage() {
             <div className="text-xs font-medium text-white/70">{t('apis.form.description')}</div>
             <div className="mt-2">
               <TextInput value={description} onChange={setDescription} placeholder="Opcional" />
+            </div>
+          </div>
+          <div className="sm:col-span-2">
+            <div className="text-xs font-medium text-white/70">Variáveis do serviço (JSON)</div>
+            <div className="mt-2">
+              <textarea
+                value={variableBindingsText}
+                onChange={(e) => setVariableBindingsText(e.target.value)}
+                placeholder='Ex: {"URL":"https://dev.example.com"}'
+                className="min-h-[120px] w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 font-mono text-xs text-zinc-50 placeholder:text-white/35 focus:border-white/20 focus:ring-2 focus:ring-[color:var(--accent)]/30"
+              />
+            </div>
+            <div className="mt-2 text-xs text-white/50">
+              Chaves devem ser únicas e podem ser usadas nas rotas como {'{NOME_DA_VARIAVEL}'}.
             </div>
           </div>
         </div>

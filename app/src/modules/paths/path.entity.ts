@@ -7,7 +7,7 @@ import {
   UpdateDateColumn,
 } from 'typeorm';
 
-export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
+export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE' | 'ANY';
 
 @Index(['apiId', 'publicPath', 'method'], { unique: true })
 @Entity({ name: 'paths' })
@@ -33,6 +33,12 @@ export class PathEntity {
 
   @Column({ type: 'uuid', nullable: true })
   authId!: string | null;
+
+  @Column({ type: 'varchar', length: 40, nullable: true })
+  authInlineType!: string | null;
+
+  @Column({ type: 'jsonb', nullable: true })
+  authInlineConfig!: Record<string, unknown> | null;
 
   @Column({ type: 'boolean', default: true })
   enabled!: boolean;

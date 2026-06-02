@@ -42,6 +42,7 @@ export class ApisService {
       ...dto,
       slug: normalizeSlug(dto.slug),
       certificateId: dto.certificateId ?? null,
+      variableBindings: dto.variableBindings ?? {},
     });
     try {
       return await this.apiRepo.save(api);
@@ -58,6 +59,7 @@ export class ApisService {
     Object.assign(api, dto);
     if (dto.slug !== undefined) api.slug = normalizeSlug(dto.slug);
     if (dto.certificateId !== undefined) api.certificateId = dto.certificateId ?? null;
+    if (dto.variableBindings !== undefined) api.variableBindings = dto.variableBindings ?? {};
     try {
       return await this.apiRepo.save(api);
     } catch (e: any) {

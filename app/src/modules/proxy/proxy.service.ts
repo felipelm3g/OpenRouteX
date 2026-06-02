@@ -89,10 +89,16 @@ export class ProxyService {
           : `${req.protocol}://${req.get('host')}`;
     const originalUrl = `${base}${req.originalUrl}`;
 
-    let api: { id: string; slug: string; certificateId: string | null } | null = null;
+    let api: { id: string; slug: string; certificateId: string | null; variableBindings: Record<string, string> } | null =
+      null;
     try {
       const found = await this.apis.getBySlug(apiSlug);
-      api = { id: found.id, slug: found.slug, certificateId: (found as any).certificateId ?? null };
+      api = {
+        id: found.id,
+        slug: found.slug,
+        certificateId: (found as any).certificateId ?? null,
+        variableBindings: (found as any).variableBindings ?? {},
+      };
     } catch {
       res.status(404).json({ error: 'API não encontrada' });
       return;
@@ -145,10 +151,11 @@ export class ProxyService {
         }
         const apiKey = await this.apiKeys.getByKey(apiKeyValue);
 
-        if (apiKey.allowedApis && apiKey.allowedApis.length > 0) {
-          if (!apiKey.allowedApis.includes(api.slug)) {
-            throw new ForbiddenException('API não permitida para esta API Key');
-          }
+        if (!apiKey.allowedApis || apiKey.allowedApis.length === 0) {
+          throw new ForbiddenException('API não permitida para esta API Key');
+        }
+        if (!apiKey.allowedApis.includes(api.slug)) {
+          throw new ForbiddenException('API não permitida para esta API Key');
         }
 
         const rl = await this.rateLimit.hit(apiKey.key, apiKey.requestsPerMinute);
@@ -192,25 +199,11 @@ export class ProxyService {
         }
       }
 
-      const queryBindings: Record<string, string> = {};
-      for (const [k, v] of Object.entries(req.query ?? {})) {
-        if (!k) continue;
-        if (v === undefined) continue;
-        const varName = String(k).trim().toUpperCase().replace(/[^A-Z0-9_]/g, '_');
-        if (!/^[A-Z0-9_]+$/.test(varName)) continue;
-        const value = Array.isArray(v) ? v.map((x) => String(x)).join(',') : String(v as any);
-        queryBindings[varName] = value;
-      }
-
-      const reservedRequestVars = new Set(['URL', 'TOKEN']);
-      const clientBindings: Record<string, string> = { ...queryBindings, ...requestBindings };
-      const filteredClientBindings: Record<string, string> = {};
-      for (const [k, v] of Object.entries(clientBindings)) {
-        if (reservedRequestVars.has(k)) continue;
-        if (apiKeyBindings[k] !== undefined) continue;
-        filteredClientBindings[k] = String(v);
-      }
-      const mergedBindings: Record<string, string> = { ...filteredClientBindings, ...apiKeyBindings };
+      const mergedBindings: Record<string, string> = {
+        ...requestBindings,
+        ...(api.variableBindings ?? {}),
+        ...apiKeyBindings,
+      };
 
       const targetTemplate = path.targetUrlTemplate;
       const clientHeaders = normalizeOutgoingHeaders(req.headers, blocked);
@@ -224,7 +217,17 @@ export class ProxyService {
         }
       }
 
-      const auth = path.authId ? await this.auths.get(path.authId) : null;
+      const inlineType = (path as any).authInlineType as string | null | undefined;
+      const inlineConfig = (path as any).authInlineConfig as Record<string, unknown> | null | undefined;
+      const auth = inlineType
+        ? ({
+            id: `inline:${path.id}`,
+            type: inlineType,
+            config: inlineConfig ?? {},
+          } as any)
+        : path.authId
+          ? await this.auths.get(path.authId)
+          : null;
       const bodyBuf = Buffer.isBuffer(req.body) ? (req.body as Buffer) : null;
       const timeoutMs = path.timeoutSeconds ? path.timeoutSeconds * 1000 : cfg.proxyTimeoutMs;
       const tls = await this.certs.getTlsForApiCertificateId(api.certificateId);

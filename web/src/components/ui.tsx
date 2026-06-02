@@ -203,6 +203,7 @@ export function Select({
 
 export function MethodBadge({ method }: { method: string }) {
   const m = String(method ?? '').trim().toUpperCase();
+  const label = m === 'ANY' ? 'ORIGEM' : method;
   const base = 'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium';
   const toneCls =
     m === 'GET' || m === 'HEAD'
@@ -218,7 +219,7 @@ export function MethodBadge({ method }: { method: string }) {
               : m === 'OPTIONS'
                 ? 'border-fuchsia-400/20 bg-fuchsia-400/10 text-fuchsia-300'
                 : 'border-white/15 bg-white/5 text-zinc-200';
-  return <span className={cn(base, toneCls)}>{method}</span>;
+  return <span className={cn(base, toneCls)}>{label}</span>;
 }
 
 type ToastItem = { id: string; title: string; description?: string; tone: 'success' | 'danger' | 'neutral' };

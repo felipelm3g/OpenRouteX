@@ -1,4 +1,4 @@
-import { IsNotEmpty, IsOptional, IsString, IsUUID, Matches } from 'class-validator';
+import { IsNotEmpty, IsObject, IsOptional, IsString, IsUUID, Matches } from 'class-validator';
 
 export class CreateApiDto {
   @IsString()
@@ -16,6 +16,10 @@ export class CreateApiDto {
   @IsOptional()
   @IsUUID()
   certificateId?: string | null;
+
+  @IsOptional()
+  @IsObject()
+  variableBindings?: Record<string, string>;
 }
 
 export class UpdateApiDto {
@@ -36,4 +40,8 @@ export class UpdateApiDto {
   @IsOptional()
   @IsUUID()
   certificateId?: string | null;
+
+  @IsOptional()
+  @IsObject()
+  variableBindings?: Record<string, string>;
 }

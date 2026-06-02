@@ -78,8 +78,22 @@ export class RequestEngineService {
       ...params.clientHeaders,
       ...addHeadersResolved.value,
     };
+
+    const resolvedAuth = (() => {
+      if (!params.auth) return null;
+      const cfgIn = (params.auth as any).config ?? {};
+      const cfgOut: Record<string, unknown> = {};
+      for (const [k, v] of Object.entries(cfgIn as Record<string, unknown>)) {
+        if (typeof v === 'string') {
+          cfgOut[k] = this.variables.resolveTemplate(v, params.apiKeyBindings).value;
+        } else {
+          cfgOut[k] = v;
+        }
+      }
+      return { ...(params.auth as any), config: cfgOut } as AuthEntity;
+    })();
     const externalAuthHeaders = await this.authEngine.buildExternalAuthHeaders(
-      params.auth,
+      resolvedAuth,
       {
         method: params.method,
         url: finalUrl,
