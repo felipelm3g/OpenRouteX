@@ -455,7 +455,11 @@ export default function PathsPage() {
               {
                 key: 'path',
                 header: t('common.path'),
-                render: (r) => <div className="font-medium text-white/90">{r.publicPath}</div>,
+                render: (r) => (
+                  <div className="font-medium text-white/90">
+                    {renderTemplateWithBoldVars(r.publicPath)}
+                  </div>
+                ),
                 sortValue: (r) => r.publicPath,
                 filterValue: (r) => `${r.publicPath} ${r.name}`,
               },
@@ -544,7 +548,7 @@ export default function PathsPage() {
                 </div>
                 <div className="text-sm font-medium text-white/90">{r.name}</div>
                 <div className="text-xs text-white/60">{apiLabelById[r.apiId] ?? r.apiId}</div>
-                <div className="text-sm font-medium text-white/90">{r.publicPath}</div>
+                <div className="text-sm font-medium text-white/90">{renderTemplateWithBoldVars(r.publicPath)}</div>
                 <div className="text-xs text-white/60 break-words">
                   {renderTemplateWithBoldVars(r.targetUrlTemplate)}
                 </div>
