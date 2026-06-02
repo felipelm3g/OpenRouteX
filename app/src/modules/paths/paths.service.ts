@@ -17,6 +17,88 @@ export class PathsService {
     private readonly variables: VariableResolverService,
   ) {}
 
+  private normalizePublicPath(input: string): string {
+    const s = String(input ?? '').trim();
+    if (!s) return '/';
+    const withLeading = s.startsWith('/') ? s : `/${s}`;
+    const noTrailing = withLeading.replace(/\/+$/, '');
+    return noTrailing || '/';
+  }
+
+  private escapeRegex(input: string): string {
+    return input.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  }
+
+  private compilePublicPathTemplate(template: string): null | { regex: RegExp; names: string[]; score: number } {
+    const normalized = this.normalizePublicPath(template);
+    const matches = Array.from(normalized.matchAll(/\{([A-Z0-9_]+)\}/g));
+    if (matches.length === 0) return null;
+
+    const names: string[] = [];
+    let pattern = '^';
+    let last = 0;
+    for (const m of matches) {
+      const full = m[0];
+      const name = m[1];
+      const idx = m.index ?? 0;
+      pattern += this.escapeRegex(normalized.slice(last, idx));
+      pattern += '([^/]+)';
+      names.push(name);
+      last = idx + full.length;
+    }
+    pattern += this.escapeRegex(normalized.slice(last));
+    pattern += '$';
+
+    const segments = normalized.split('/').filter(Boolean);
+    const staticSegments = segments.filter((s) => !s.includes('{')).length;
+    const score = staticSegments * 10000 + normalized.length - names.length * 10;
+
+    return { regex: new RegExp(pattern), names, score };
+  }
+
+  private safeDecodeURIComponent(input: string): string {
+    try {
+      return decodeURIComponent(input);
+    } catch {
+      return input;
+    }
+  }
+
+  async findBestMatchByApiAndRequestPath(
+    apiId: string,
+    requestPublicPath: string,
+    method: string,
+  ): Promise<null | { path: PathEntity; bindings: Record<string, string> }> {
+    const requestPath = this.normalizePublicPath(requestPublicPath);
+    const candidates = await this.pathRepo.find({
+      where: { apiId, method: method as any, enabled: true },
+      order: { createdAt: 'DESC' },
+    });
+
+    let best: null | { path: PathEntity; bindings: Record<string, string>; score: number } = null;
+    for (const p of candidates) {
+      const compiled = this.compilePublicPathTemplate(p.publicPath);
+      if (!compiled) continue;
+
+      const m = compiled.regex.exec(requestPath);
+      if (!m) continue;
+
+      const bindings: Record<string, string> = {};
+      for (let i = 0; i < compiled.names.length; i++) {
+        const name = compiled.names[i];
+        const value = m[i + 1] ?? '';
+        bindings[name] = this.safeDecodeURIComponent(String(value));
+      }
+
+      if (!best || compiled.score > best.score) {
+        best = { path: p, bindings, score: compiled.score };
+      }
+    }
+
+    if (!best) return null;
+    return { path: best.path, bindings: best.bindings };
+  }
+
   private assertNoVariablesWhenPublic(params: {
     requireClientAuth: boolean;
     targetUrlTemplate: string;

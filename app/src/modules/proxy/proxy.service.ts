@@ -98,10 +98,16 @@ export class ProxyService {
       return;
     }
 
-    const path = await this.paths.findByApiAndPublicPath(api.id, publicPath, req.method);
-    if (!path || !path.enabled) {
-      res.status(404).json({ error: 'Rota não encontrada' });
-      return;
+    let path = await this.paths.findByApiAndPublicPath(api.id, publicPath, req.method);
+    let requestBindings: Record<string, string> = {};
+    if (!path) {
+      const matched = await this.paths.findBestMatchByApiAndRequestPath(api.id, publicPath, req.method);
+      if (!matched) {
+        res.status(404).json({ error: 'Rota não encontrada' });
+        return;
+      }
+      path = matched.path;
+      requestBindings = matched.bindings;
     }
 
     const cfg = await this.settings.getSettings();
@@ -186,6 +192,26 @@ export class ProxyService {
         }
       }
 
+      const queryBindings: Record<string, string> = {};
+      for (const [k, v] of Object.entries(req.query ?? {})) {
+        if (!k) continue;
+        if (v === undefined) continue;
+        const varName = String(k).trim().toUpperCase().replace(/[^A-Z0-9_]/g, '_');
+        if (!/^[A-Z0-9_]+$/.test(varName)) continue;
+        const value = Array.isArray(v) ? v.map((x) => String(x)).join(',') : String(v as any);
+        queryBindings[varName] = value;
+      }
+
+      const reservedRequestVars = new Set(['URL', 'TOKEN']);
+      const clientBindings: Record<string, string> = { ...queryBindings, ...requestBindings };
+      const filteredClientBindings: Record<string, string> = {};
+      for (const [k, v] of Object.entries(clientBindings)) {
+        if (reservedRequestVars.has(k)) continue;
+        if (apiKeyBindings[k] !== undefined) continue;
+        filteredClientBindings[k] = String(v);
+      }
+      const mergedBindings: Record<string, string> = { ...filteredClientBindings, ...apiKeyBindings };
+
       const targetTemplate = path.targetUrlTemplate;
       const clientHeaders = normalizeOutgoingHeaders(req.headers, blocked);
 
@@ -215,7 +241,7 @@ export class ProxyService {
         addQuery: Object.fromEntries(
           Object.entries(path.addQuery ?? {}).map(([k, v]) => [k, String(v)]),
         ),
-        apiKeyBindings,
+        apiKeyBindings: mergedBindings,
         auth,
         timeoutMs,
         tls,

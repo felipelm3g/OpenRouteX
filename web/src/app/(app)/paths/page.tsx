@@ -37,6 +37,28 @@ function errorMessage(e: unknown) {
   return typeof msg === 'string' && msg.trim() ? msg : 'Falha';
 }
 
+function renderTemplateWithBoldVars(template: string) {
+  const s = String(template ?? '');
+  const re = /\{[^}]+\}/g;
+  const out: React.ReactNode[] = [];
+  let last = 0;
+  let i = 0;
+  for (const m of s.matchAll(re)) {
+    const idx = m.index ?? 0;
+    if (idx > last) {
+      out.push(<span key={`t-${i++}`}>{s.slice(last, idx)}</span>);
+    }
+    out.push(
+      <span key={`v-${i++}`} className="font-semibold text-white/90">
+        {m[0]}
+      </span>,
+    );
+    last = idx + m[0].length;
+  }
+  if (last < s.length) out.push(<span key={`t-${i++}`}>{s.slice(last)}</span>);
+  return <>{out}</>;
+}
+
 export default function PathsPage() {
   const { t } = useI18n();
   const qc = useQueryClient();
@@ -420,7 +442,9 @@ export default function PathsPage() {
                 key: 'target',
                 header: t('paths.table.targetUrl'),
                 render: (r) => (
-                  <div className="max-w-[520px] truncate text-white/70">{r.targetUrlTemplate}</div>
+                  <div className="max-w-[520px] truncate text-white/70">
+                    {renderTemplateWithBoldVars(r.targetUrlTemplate)}
+                  </div>
                 ),
                 sortValue: (r) => r.targetUrlTemplate,
                 filterValue: (r) => r.targetUrlTemplate,
@@ -499,7 +523,9 @@ export default function PathsPage() {
                 <div className="text-sm font-medium text-white/90">{r.name}</div>
                 <div className="text-xs text-white/60">{apiLabelById[r.apiId] ?? r.apiId}</div>
                 <div className="text-sm font-medium text-white/90">{r.publicPath}</div>
-                <div className="text-xs text-white/60 break-words">{r.targetUrlTemplate}</div>
+                <div className="text-xs text-white/60 break-words">
+                  {renderTemplateWithBoldVars(r.targetUrlTemplate)}
+                </div>
                 <div className="mt-2 flex items-center gap-2">
                   <Button
                     variant="ghost"
