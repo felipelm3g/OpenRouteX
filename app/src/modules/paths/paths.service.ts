@@ -31,7 +31,7 @@ export class PathsService {
 
   private compilePublicPathTemplate(template: string): null | { regex: RegExp; names: string[]; score: number } {
     const normalized = this.normalizePublicPath(template);
-    const matches = Array.from(normalized.matchAll(/\{([A-Z0-9_]+)\}/g));
+    const matches = Array.from(normalized.matchAll(/\{([a-zA-Z0-9_]+)\}/g));
     if (matches.length === 0) return null;
 
     const names: string[] = [];
@@ -39,7 +39,7 @@ export class PathsService {
     let last = 0;
     for (const m of matches) {
       const full = m[0];
-      const name = m[1];
+      const name = String(m[1] ?? '').toUpperCase();
       const idx = m.index ?? 0;
       pattern += this.escapeRegex(normalized.slice(last, idx));
       pattern += '([^/]+)';

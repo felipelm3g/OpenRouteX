@@ -1,7 +1,7 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { DataTable } from '@/components/data-table';
 import { useI18n } from '@/components/i18n-provider';
@@ -64,6 +64,7 @@ export default function PathsPage() {
   const qc = useQueryClient();
   const toast = useToast();
   const [focus, setFocus] = useState('');
+  const publicPathRef = useRef<HTMLInputElement | null>(null);
 
   const settingsQ = useQuery({ queryKey: ['settings'], queryFn: () => apiFetch<SettingsDto>('/admin/settings') });
   const defaultForward = settingsQ.data?.defaultForwardClientQuery ?? true;
@@ -211,6 +212,27 @@ export default function PathsPage() {
     const fromQuery = detectVariablesInRecord(parsedAdds.query);
     return Array.from(new Set([...fromTarget, ...fromHeaders, ...fromQuery])).sort();
   }, [parsedAdds.headers, parsedAdds.query, targetUrlTemplate]);
+
+  const insertPublicPathSnippet = useCallback(
+    (snippet: string, selection?: { start: number; end: number }) => {
+      const el = publicPathRef.current;
+      const current = String(publicPath ?? '');
+      const start = el?.selectionStart ?? current.length;
+      const end = el?.selectionEnd ?? current.length;
+      const next = current.slice(0, start) + snippet + current.slice(end);
+      setPublicPath(next);
+
+      if (!el) return;
+      requestAnimationFrame(() => {
+        el.focus();
+        const base = start;
+        const selStart = selection ? base + selection.start : base + snippet.length;
+        const selEnd = selection ? base + selection.end : base + snippet.length;
+        el.setSelectionRange(selStart, selEnd);
+      });
+    },
+    [publicPath],
+  );
 
   const reset = useCallback(() => {
     setEditing(null);
@@ -625,7 +647,21 @@ export default function PathsPage() {
           <div className="sm:col-span-2">
             <div className="text-xs font-medium text-white/70">{t('paths.form.publicPath')}</div>
             <div className="mt-2">
-              <TextInput value={publicPath} onChange={setPublicPath} placeholder="/dados" />
+              <div className="flex items-center gap-2">
+                <div className="flex-1">
+                  <TextInput ref={publicPathRef} value={publicPath} onChange={setPublicPath} placeholder="/dados" />
+                </div>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  type="button"
+                  onClick={() => insertPublicPathSnippet('/{VAR}', { start: 2, end: 5 })}
+                  title="Inserir variável"
+                  ariaLabel="Inserir variável"
+                >
+                  {'{VAR}'}
+                </Button>
+              </div>
             </div>
           </div>
           <div className="sm:col-span-2">

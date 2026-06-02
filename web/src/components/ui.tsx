@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { createContext, useCallback, useContext, useMemo, useState } from 'react';
+import { createContext, forwardRef, useCallback, useContext, useMemo, useState } from 'react';
 
 export function cn(...parts: Array<string | false | null | undefined>) {
   return parts.filter(Boolean).join(' ');
@@ -157,19 +157,15 @@ export function Button({
   );
 }
 
-export function TextInput({
-  value,
-  onChange,
-  placeholder,
-  type = 'text',
-}: {
+export const TextInput = forwardRef<HTMLInputElement, {
   value: string;
   onChange: (v: string) => void;
   placeholder?: string;
   type?: string;
-}) {
+}>(({ value, onChange, placeholder, type = 'text' }, ref) => {
   return (
     <input
+      ref={ref}
       value={value}
       onChange={(e) => onChange(e.target.value)}
       placeholder={placeholder}
@@ -177,7 +173,9 @@ export function TextInput({
       className="h-10 w-full rounded-xl border border-white/10 bg-white/5 px-3 text-sm text-zinc-50 placeholder:text-white/35 focus:border-white/20 focus:ring-2 focus:ring-[color:var(--accent)]/30"
     />
   );
-}
+});
+
+TextInput.displayName = 'TextInput';
 
 export function Select({
   value,
