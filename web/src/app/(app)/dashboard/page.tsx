@@ -10,6 +10,9 @@ import { Badge, Button, Card, CardBody, CardHeader, MethodBadge, PageShell, Sele
 import { apiFetch } from '@/lib/api';
 import { env } from '@/lib/env';
 
+type ApiRow = { id: string; name: string; slug: string };
+type PathDef = { id: string; apiId: string; publicPath: string; method: string; enabled: boolean };
+
 type Metrics = {
   windowHours: number;
   totalRequests: number;
@@ -70,6 +73,10 @@ type LogsMetaDto = {
 };
 
 type LatencyUnit = 'ms' | 's';
+
+function toStarPathLabel(input: string) {
+  return String(input ?? '').replace(/\{[^}]+\}/g, '*');
+}
 
 function getCookieValue(name: string): string {
   if (typeof document === 'undefined') return '';
@@ -191,6 +198,25 @@ export default function DashboardPage() {
   const [openId, setOpenId] = useState<string | null>(null);
   const [openFromUrl, setOpenFromUrl] = useState('');
 
+  const apisQ = useQuery({
+    queryKey: ['apis'],
+    queryFn: () => apiFetch<ApiRow[]>('/admin/apis'),
+  });
+
+  const apiIdBySlug = useMemo(() => {
+    const map: Record<string, string> = {};
+    for (const a of apisQ.data ?? []) map[String(a.slug)] = String(a.id);
+    return map;
+  }, [apisQ.data]);
+
+  const selectedApiId = api ? apiIdBySlug[api] ?? '' : '';
+
+  const routesQ = useQuery({
+    queryKey: ['dashboard-paths', selectedApiId],
+    enabled: Boolean(selectedApiId),
+    queryFn: () => apiFetch<PathDef[]>(`/admin/paths?apiId=${encodeURIComponent(selectedApiId)}`),
+  });
+
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const v = new URLSearchParams(window.location.search).get('openLogId') ?? '';
@@ -226,21 +252,6 @@ export default function DashboardPage() {
     queryKey: ['logs-meta-apis', status, from, to, tz],
     queryFn: () => {
       const qs = new URLSearchParams();
-      const fromIso = from ? zonedDateTimeLocalToUtcIso(from, tz) : null;
-      const toIso = to ? zonedDateTimeLocalToUtcIso(to, tz) : null;
-      if (fromIso) qs.set('from', fromIso);
-      if (toIso) qs.set('to', toIso);
-      if (status) qs.set('status', status);
-      return apiFetch<LogsMetaDto>(`/admin/logs/meta?${qs.toString()}`);
-    },
-  });
-
-  const metaPathsQ = useQuery({
-    queryKey: ['logs-meta-paths', api, status, from, to, tz],
-    enabled: Boolean(api),
-    queryFn: () => {
-      const qs = new URLSearchParams();
-      qs.set('api', api);
       const fromIso = from ? zonedDateTimeLocalToUtcIso(from, tz) : null;
       const toIso = to ? zonedDateTimeLocalToUtcIso(to, tz) : null;
       if (fromIso) qs.set('from', fromIso);
@@ -342,19 +353,36 @@ export default function DashboardPage() {
   const detail = detailQ.data;
 
   const apiOptions = useMemo(() => {
-    const opts = (metaApisQ.data?.apiSlugs ?? []).map((x) => ({ value: x.value, label: `/${x.value}` }));
+    const opts = (metaApisQ.data?.apiSlugs ?? []).map((x: { value: string; count: number }) => ({
+      value: x.value,
+      label: `/${x.value}`,
+    }));
     return [{ value: '', label: 'Slug: todos' }, ...opts];
   }, [metaApisQ.data]);
 
   const pathOptions = useMemo(() => {
     if (!api) return [{ value: '', label: 'Path: selecione um slug' }];
-    const opts = (metaPathsQ.data?.paths ?? []).map((x) => ({ value: x.value, label: x.value }));
+    if (!selectedApiId) return [{ value: '', label: 'Path: selecione um slug' }];
+    const enabledPaths = (routesQ.data ?? []).filter((p: PathDef) => p.enabled);
+    const byLabel = new Map<string, string>();
+    for (const p of enabledPaths) {
+      const value = String(p.publicPath ?? '');
+      const label = toStarPathLabel(value);
+      if (!label) continue;
+      if (!byLabel.has(label)) byLabel.set(label, value);
+    }
+    const opts = Array.from(byLabel.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([label, value]) => ({ value, label }));
     return [{ value: '', label: 'Path: todos' }, ...opts];
-  }, [api, metaPathsQ.data]);
+  }, [api, routesQ.data, selectedApiId]);
 
   const statusOptions = useMemo(() => {
     const raw = metaStatusQ.data?.statuses ?? metaApisQ.data?.statuses ?? [];
-    const opts = raw.map((x) => ({ value: String(x.value), label: `${x.value} (${x.count})` }));
+    const opts = raw.map((x: { value: number; count: number }) => ({
+      value: String(x.value),
+      label: `${x.value} (${x.count})`,
+    }));
     return [{ value: '', label: 'Status: todos' }, ...opts];
   }, [metaApisQ.data, metaStatusQ.data]);
 

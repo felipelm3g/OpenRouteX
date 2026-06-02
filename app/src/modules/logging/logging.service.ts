@@ -13,6 +13,63 @@ export class LoggingService {
     private readonly logRepo: Repository<RequestLogEntity>,
   ) {}
 
+  private normalizePublicPath(input: string): string {
+    const s = String(input ?? '').trim();
+    if (!s) return '/';
+    const withLeading = s.startsWith('/') ? s : `/${s}`;
+    const noTrailing = withLeading.replace(/\/+$/, '');
+    return noTrailing || '/';
+  }
+
+  private escapeRegex(input: string): string {
+    return input.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  }
+
+  private publicPathTemplateToRegex(template: string): string {
+    const normalized = this.normalizePublicPath(template);
+    const hasBraces = normalized.includes('{') && normalized.includes('}');
+    const hasStars = normalized.includes('*');
+    if (!hasBraces && !hasStars) return `^${this.escapeRegex(normalized)}$`;
+
+    let pattern = '^';
+    let i = 0;
+    while (i < normalized.length) {
+      const ch = normalized[i]!;
+      if (ch === '{') {
+        const end = normalized.indexOf('}', i + 1);
+        if (end === -1) {
+          pattern += this.escapeRegex(ch);
+          i += 1;
+          continue;
+        }
+        pattern += '([^/]+)';
+        i = end + 1;
+        continue;
+      }
+      if (ch === '*') {
+        pattern += '([^/]+)';
+        i += 1;
+        continue;
+      }
+      pattern += this.escapeRegex(ch);
+      i += 1;
+    }
+    pattern += '$';
+    return pattern;
+  }
+
+  private applyPublicPathFilter(qb: ReturnType<Repository<RequestLogEntity>['createQueryBuilder']>, raw: string) {
+    const normalized = this.normalizePublicPath(raw);
+    const isTemplate = normalized.includes('{') || normalized.includes('*');
+    if (!isTemplate) {
+      qb.andWhere('l.publicPath = :publicPath', { publicPath: normalized });
+      return;
+    }
+    qb.andWhere('l.publicPath ~ :publicPathRe', {
+      publicPathRe: this.publicPathTemplateToRegex(normalized),
+    });
+  }
+
   private headerValue(headers: Record<string, string | string[]> | null | undefined, key: string) {
     if (!headers) return null;
     const lk = key.toLowerCase();
@@ -170,7 +227,7 @@ export class LoggingService {
     const qb = this.logRepo.createQueryBuilder('l').orderBy('l.createdAt', 'DESC').limit(limit);
     if (params?.apiSlug) qb.andWhere('l.apiSlug = :apiSlug', { apiSlug: params.apiSlug });
     if (params?.apiKey) qb.andWhere('l.apiKey = :apiKey', { apiKey: params.apiKey });
-    if (params?.publicPath) qb.andWhere('l.publicPath = :publicPath', { publicPath: params.publicPath });
+    if (params?.publicPath) this.applyPublicPathFilter(qb, params.publicPath);
     if (params?.statusCode) qb.andWhere('l.statusCode = :statusCode', { statusCode: params.statusCode });
     if (params?.from) qb.andWhere('l.createdAt >= :from', { from: params.from });
     if (params?.to) qb.andWhere('l.createdAt <= :to', { to: params.to });
@@ -191,7 +248,7 @@ export class LoggingService {
     const qb = this.logRepo.createQueryBuilder('l').orderBy('l.createdAt', 'DESC').limit(limit);
     if (params?.apiSlug) qb.andWhere('l.apiSlug = :apiSlug', { apiSlug: params.apiSlug });
     if (params?.apiKey) qb.andWhere('l.apiKey = :apiKey', { apiKey: params.apiKey });
-    if (params?.publicPath) qb.andWhere('l.publicPath = :publicPath', { publicPath: params.publicPath });
+    if (params?.publicPath) this.applyPublicPathFilter(qb, params.publicPath);
     if (params?.from) qb.andWhere('l.createdAt >= :from', { from: params.from });
     if (params?.to) qb.andWhere('l.createdAt <= :to', { to: params.to });
     if (params?.status) {
@@ -233,7 +290,7 @@ export class LoggingService {
     if (params?.from) qb.andWhere('l.createdAt >= :from', { from: params.from });
     if (params?.to) qb.andWhere('l.createdAt <= :to', { to: params.to });
     if (params?.apiSlug) qb.andWhere('l.apiSlug = :apiSlug', { apiSlug: params.apiSlug });
-    if (params?.publicPath) qb.andWhere('l.publicPath = :publicPath', { publicPath: params.publicPath });
+    if (params?.publicPath) this.applyPublicPathFilter(qb, params.publicPath);
     if (params?.method) qb.andWhere('l.method = :method', { method: params.method });
     if (params?.statusCode) qb.andWhere('l.statusCode = :statusCode', { statusCode: params.statusCode });
     if (params?.status) {
@@ -275,7 +332,16 @@ export class LoggingService {
         p95: string | null;
       }>();
 
-    return rows.map((r) => ({
+    return rows.map((r: {
+      apiSlug: string;
+      publicPath: string;
+      method: string;
+      total: string;
+      success: string;
+      error: string;
+      avg: string | null;
+      p95: string | null;
+    }) => ({
       apiSlug: String(r.apiSlug),
       publicPath: String(r.publicPath),
       method: String(r.method),
@@ -301,7 +367,7 @@ export class LoggingService {
     if (params?.from) qb.andWhere('l.createdAt >= :from', { from: params.from });
     if (params?.to) qb.andWhere('l.createdAt <= :to', { to: params.to });
     if (params?.apiSlug) qb.andWhere('l.apiSlug = :apiSlug', { apiSlug: params.apiSlug });
-    if (params?.publicPath) qb.andWhere('l.publicPath = :publicPath', { publicPath: params.publicPath });
+    if (params?.publicPath) this.applyPublicPathFilter(qb, params.publicPath);
 
     const rows = await qb
       .select("EXTRACT(DOW FROM (l.createdAt AT TIME ZONE :tz))::int", 'dow')
@@ -319,7 +385,7 @@ export class LoggingService {
       .addOrderBy('hour', 'ASC')
       .getRawMany<{ dow: number; hour: number; total: string; errors: string }>();
 
-    return rows.map((r) => ({
+    return rows.map((r: { dow: number; hour: number; total: string; errors: string }) => ({
       dow: Number(r.dow),
       hour: Number(r.hour),
       total: Number(r.total ?? 0),
@@ -339,7 +405,7 @@ export class LoggingService {
     if (params?.from) base.andWhere('l.createdAt >= :from', { from: params.from });
     if (params?.to) base.andWhere('l.createdAt <= :to', { to: params.to });
     if (params?.apiSlug) base.andWhere('l.apiSlug = :apiSlug', { apiSlug: params.apiSlug });
-    if (params?.publicPath) base.andWhere('l.publicPath = :publicPath', { publicPath: params.publicPath });
+    if (params?.publicPath) this.applyPublicPathFilter(base, params.publicPath);
     if (params?.statusCode) base.andWhere('l.statusCode = :statusCode', { statusCode: params.statusCode });
     if (params?.status) {
       const s = String(params.status).toLowerCase();
@@ -510,7 +576,7 @@ export class LoggingService {
     base.where('l.createdAt >= :from', { from });
     base.andWhere('l.createdAt <= :to', { to });
     if (params?.apiSlug) base.andWhere('l.apiSlug = :apiSlug', { apiSlug: params.apiSlug });
-    if (params?.publicPath) base.andWhere('l.publicPath = :publicPath', { publicPath: params.publicPath });
+    if (params?.publicPath) this.applyPublicPathFilter(base, params.publicPath);
     if (params?.statusCode) base.andWhere('l.statusCode = :statusCode', { statusCode: params.statusCode });
     if (params?.status) {
       const s = String(params.status).toLowerCase();
