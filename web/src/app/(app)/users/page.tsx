@@ -6,7 +6,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { DataTable } from '@/components/data-table';
 import { useI18n } from '@/components/i18n-provider';
 import { ConfirmModal, Modal } from '@/components/modal';
-import { Badge, Button, Card, CardBody, CardHeader, PageShell, Select, TextInput, useToast } from '@/components/ui';
+import { ActionMenu, Badge, Button, Card, CardBody, CardHeader, PageShell, Select, TextInput, useToast } from '@/components/ui';
 import { apiFetch } from '@/lib/api';
 
 type User = {
@@ -398,83 +398,103 @@ export default function UsersPage() {
                 key: 'actions',
                 header: t('common.actions'),
                 render: (r) => (
-                  <div className="flex items-center gap-2">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => beginEdit(r)}
-                      title={t('common.edit')}
-                      ariaLabel={t('common.edit')}
-                    >
-                      <IconEdit className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => openPermissions(r)}
-                      disabled={Boolean(r.isPrimaryAdmin)}
-                      title={t('common.permissions')}
-                      ariaLabel={t('common.permissions')}
-                    >
-                      <IconPermissions className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => askSendResetEmail(r)}
-                      disabled={sendResetEmail.isPending}
-                      title={t('users.resetPasswordEmail')}
-                      ariaLabel={t('users.resetPasswordEmail')}
-                    >
-                      <IconMail className="h-4 w-4" />
-                    </Button>
-                    {!r.isPrimaryAdmin ? (
-                      <>
-                        {r.status === 'ACTIVE' ? (
+                  <div className="flex items-center justify-end">
+                    <div className="hidden items-center gap-2 lg:flex">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => beginEdit(r)}
+                        title={t('common.edit')}
+                        ariaLabel={t('common.edit')}
+                      >
+                        <IconEdit className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => openPermissions(r)}
+                        disabled={Boolean(r.isPrimaryAdmin)}
+                        title={t('common.permissions')}
+                        ariaLabel={t('common.permissions')}
+                      >
+                        <IconPermissions className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => askSendResetEmail(r)}
+                        disabled={sendResetEmail.isPending}
+                        title={t('users.resetPasswordEmail')}
+                        ariaLabel={t('users.resetPasswordEmail')}
+                      >
+                        <IconMail className="h-4 w-4" />
+                      </Button>
+                      {!r.isPrimaryAdmin ? (
+                        <>
+                          {r.status === 'ACTIVE' ? (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => block.mutate(r.id)}
+                              disabled={block.isPending}
+                              title={t('common.block')}
+                              ariaLabel={t('common.block')}
+                            >
+                              <IconBlock className="h-4 w-4" />
+                            </Button>
+                          ) : (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => unblock.mutate(r.id)}
+                              disabled={unblock.isPending}
+                              title={t('common.unblock')}
+                              ariaLabel={t('common.unblock')}
+                            >
+                              <IconUnblock className="h-4 w-4" />
+                            </Button>
+                          )}
                           <Button
                             variant="ghost"
                             size="icon"
-                            onClick={() => block.mutate(r.id)}
-                            disabled={block.isPending}
-                            title={t('common.block')}
-                            ariaLabel={t('common.block')}
+                            onClick={() => clearLock.mutate(r.id)}
+                            disabled={clearLock.isPending}
+                            title={t('users.clearLoginLock')}
+                            ariaLabel={t('users.clearLoginLock')}
                           >
-                            <IconBlock className="h-4 w-4" />
+                            <IconUnlock className="h-4 w-4" />
                           </Button>
-                        ) : (
                           <Button
-                            variant="ghost"
+                            variant="danger"
                             size="icon"
-                            onClick={() => unblock.mutate(r.id)}
-                            disabled={unblock.isPending}
-                            title={t('common.unblock')}
-                            ariaLabel={t('common.unblock')}
+                            onClick={() => askDelete(r)}
+                            disabled={del.isPending}
+                            title={t('common.delete')}
+                            ariaLabel={t('common.delete')}
                           >
-                            <IconUnblock className="h-4 w-4" />
+                            <IconTrash className="h-4 w-4" />
                           </Button>
-                        )}
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => clearLock.mutate(r.id)}
-                          disabled={clearLock.isPending}
-                          title={t('users.clearLoginLock')}
-                          ariaLabel={t('users.clearLoginLock')}
-                        >
-                          <IconUnlock className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="danger"
-                          size="icon"
-                          onClick={() => askDelete(r)}
-                          disabled={del.isPending}
-                          title={t('common.delete')}
-                          ariaLabel={t('common.delete')}
-                        >
-                          <IconTrash className="h-4 w-4" />
-                        </Button>
-                      </>
-                    ) : null}
+                        </>
+                      ) : null}
+                    </div>
+                    <div className="lg:hidden">
+                      <ActionMenu
+                        ariaLabel={t('common.actions')}
+                        items={[
+                          { label: t('common.edit'), onClick: () => beginEdit(r) },
+                          { label: t('common.permissions'), onClick: () => openPermissions(r), disabled: Boolean(r.isPrimaryAdmin) },
+                          { label: t('users.resetPasswordEmail'), onClick: () => askSendResetEmail(r), disabled: sendResetEmail.isPending },
+                          {
+                            label: r.status === 'ACTIVE' ? t('common.block') : t('common.unblock'),
+                            onClick: () => (r.status === 'ACTIVE' ? block.mutate(r.id) : unblock.mutate(r.id)),
+                            disabled: r.status === 'ACTIVE' ? block.isPending : unblock.isPending,
+                            hidden: Boolean(r.isPrimaryAdmin),
+                          },
+                          { label: t('users.clearLoginLock'), onClick: () => clearLock.mutate(r.id), disabled: clearLock.isPending, hidden: Boolean(r.isPrimaryAdmin) },
+                          { label: t('common.delete'), onClick: () => askDelete(r), tone: 'danger', disabled: del.isPending, hidden: Boolean(r.isPrimaryAdmin) },
+                        ]}
+                      />
+                    </div>
                   </div>
                 ),
               },
@@ -483,87 +503,27 @@ export default function UsersPage() {
               <div className="grid gap-2">
                 <div className="flex items-center justify-between">
                   <div className="text-sm font-medium text-white/90">{r.username}</div>
-                  {r.status === 'ACTIVE' ? <Badge tone="success">{t('users.status.active')}</Badge> : <Badge tone="danger">{t('users.status.disabled')}</Badge>}
+                  <div className="flex items-center gap-2">
+                    {r.status === 'ACTIVE' ? <Badge tone="success">{t('users.status.active')}</Badge> : <Badge tone="danger">{t('users.status.disabled')}</Badge>}
+                    <ActionMenu
+                      ariaLabel={t('common.actions')}
+                      items={[
+                        { label: t('common.edit'), onClick: () => beginEdit(r) },
+                        { label: t('common.permissions'), onClick: () => openPermissions(r), disabled: Boolean(r.isPrimaryAdmin) },
+                        { label: t('users.resetPasswordEmail'), onClick: () => askSendResetEmail(r), disabled: sendResetEmail.isPending },
+                        {
+                          label: r.status === 'ACTIVE' ? t('common.block') : t('common.unblock'),
+                          onClick: () => (r.status === 'ACTIVE' ? block.mutate(r.id) : unblock.mutate(r.id)),
+                          disabled: r.status === 'ACTIVE' ? block.isPending : unblock.isPending,
+                          hidden: Boolean(r.isPrimaryAdmin),
+                        },
+                        { label: t('users.clearLoginLock'), onClick: () => clearLock.mutate(r.id), disabled: clearLock.isPending, hidden: Boolean(r.isPrimaryAdmin) },
+                        { label: t('common.delete'), onClick: () => askDelete(r), tone: 'danger', disabled: del.isPending, hidden: Boolean(r.isPrimaryAdmin) },
+                      ]}
+                    />
+                  </div>
                 </div>
                 <div className="text-xs text-white/60">{r.email}</div>
-                <div className="mt-2 flex flex-wrap gap-2">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => beginEdit(r)}
-                    title={t('common.edit')}
-                    ariaLabel={t('common.edit')}
-                  >
-                    <IconEdit className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => openPermissions(r)}
-                    disabled={Boolean(r.isPrimaryAdmin)}
-                    title={t('common.permissions')}
-                    ariaLabel={t('common.permissions')}
-                  >
-                    <IconPermissions className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => askSendResetEmail(r)}
-                    disabled={sendResetEmail.isPending}
-                    title={t('users.resetPasswordEmail')}
-                    ariaLabel={t('users.resetPasswordEmail')}
-                  >
-                    <IconMail className="h-4 w-4" />
-                  </Button>
-                  {!r.isPrimaryAdmin ? (
-                    <>
-                      {r.status === 'ACTIVE' ? (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => block.mutate(r.id)}
-                          disabled={block.isPending}
-                          title={t('common.block')}
-                          ariaLabel={t('common.block')}
-                        >
-                          <IconBlock className="h-4 w-4" />
-                        </Button>
-                      ) : (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => unblock.mutate(r.id)}
-                          disabled={unblock.isPending}
-                          title={t('common.unblock')}
-                          ariaLabel={t('common.unblock')}
-                        >
-                          <IconUnblock className="h-4 w-4" />
-                        </Button>
-                      )}
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => clearLock.mutate(r.id)}
-                        disabled={clearLock.isPending}
-                        title={t('users.clearLoginLock')}
-                        ariaLabel={t('users.clearLoginLock')}
-                      >
-                        <IconUnlock className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="danger"
-                        size="icon"
-                        onClick={() => askDelete(r)}
-                        disabled={del.isPending}
-                        title={t('common.delete')}
-                        ariaLabel={t('common.delete')}
-                      >
-                        <IconTrash className="h-4 w-4" />
-                      </Button>
-                    </>
-                  ) : null}
-                </div>
               </div>
             )}
             empty={t('users.empty')}

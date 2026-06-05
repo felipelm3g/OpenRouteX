@@ -6,7 +6,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { DataTable } from '@/components/data-table';
 import { useI18n } from '@/components/i18n-provider';
 import { ConfirmModal, Modal } from '@/components/modal';
-import { Badge, Button, Card, CardBody, CardHeader, MethodBadge, PageShell, Select, TextInput, useToast } from '@/components/ui';
+import { ActionMenu, Badge, Button, Card, CardBody, CardHeader, MethodBadge, PageShell, Select, TextInput, useToast } from '@/components/ui';
 import { apiFetch } from '@/lib/api';
 import { env } from '@/lib/env';
 import { detectVariables, detectVariablesInRecord } from '@/lib/vars';
@@ -38,6 +38,7 @@ type Path = {
   addHeaders: Record<string, string>;
   addQuery: Record<string, string>;
   forwardClientQuery: boolean;
+  forwardClientHeaders?: boolean;
   timeoutSeconds: number | null;
   createdAt: string;
 };
@@ -153,6 +154,7 @@ export default function PathsPage() {
   const [enabled, setEnabled] = useState(true);
   const [requireClientAuth, setRequireClientAuth] = useState(true);
   const [forwardClientQuery, setForwardClientQuery] = useState(true);
+  const [forwardClientHeaders, setForwardClientHeaders] = useState(true);
   const [addHeadersText, setAddHeadersText] = useState('{}');
   const [addQueryText, setAddQueryText] = useState('{}');
   const [timeoutSeconds, setTimeoutSeconds] = useState('');
@@ -313,6 +315,7 @@ export default function PathsPage() {
     setEnabled(true);
     setRequireClientAuth(true);
     setForwardClientQuery(defaultForward);
+    setForwardClientHeaders(true);
     setAddHeadersText('{}');
     setAddQueryText('{}');
     setTimeoutSeconds('');
@@ -342,6 +345,7 @@ export default function PathsPage() {
     setEnabled(Boolean(p.enabled));
     setRequireClientAuth(p.requireClientAuth !== false);
     setForwardClientQuery(p.forwardClientQuery !== false);
+    setForwardClientHeaders((p as any).forwardClientHeaders !== false);
     setAddHeadersText(JSON.stringify(p.addHeaders ?? {}, null, 2));
     setAddQueryText(JSON.stringify(p.addQuery ?? {}, null, 2));
     setTimeoutSeconds(p.timeoutSeconds ? String(p.timeoutSeconds) : '');
@@ -367,6 +371,7 @@ export default function PathsPage() {
     setEnabled(Boolean(p.enabled));
     setRequireClientAuth(p.requireClientAuth !== false);
     setForwardClientQuery(p.forwardClientQuery !== false);
+    setForwardClientHeaders((p as any).forwardClientHeaders !== false);
     setAddHeadersText(JSON.stringify(p.addHeaders ?? {}, null, 2));
     setAddQueryText(JSON.stringify(p.addQuery ?? {}, null, 2));
     setTimeoutSeconds(p.timeoutSeconds ? String(p.timeoutSeconds) : '');
@@ -421,6 +426,7 @@ export default function PathsPage() {
         addHeaders: parsedAdds.headers,
         addQuery: parsedAdds.query,
         forwardClientQuery,
+        forwardClientHeaders,
         timeoutSeconds: timeoutSeconds.trim() ? Number(timeoutSeconds) : null,
       };
       if (editing) {
@@ -595,98 +601,85 @@ export default function PathsPage() {
                 key: 'actions',
                 header: t('common.actions'),
                 render: (r) => (
-                  <div className="flex items-center gap-2">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => void copyUrl(r)}
-                      title={t('paths.actions.copyUrl')}
-                      ariaLabel={t('paths.actions.copyUrl')}
-                    >
-                      <IconCopy className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => beginEdit(r)}
-                      title={t('common.edit')}
-                      ariaLabel={t('common.edit')}
-                    >
-                      <IconEdit className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => beginDuplicate(r)}
-                      title={t('paths.actions.duplicate')}
-                      ariaLabel={t('paths.actions.duplicate')}
-                    >
-                      <IconDuplicate className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="danger"
-                      size="icon"
-                      onClick={() => askDelete(r)}
-                      disabled={del.isPending}
-                      title={t('common.delete')}
-                      ariaLabel={t('common.delete')}
-                    >
-                      <IconTrash className="h-4 w-4" />
-                    </Button>
+                  <div className="flex items-center justify-end">
+                    <div className="hidden items-center gap-2 lg:flex">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => void copyUrl(r)}
+                        title={t('paths.actions.copyUrl')}
+                        ariaLabel={t('paths.actions.copyUrl')}
+                      >
+                        <IconCopy className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => beginEdit(r)}
+                        title={t('common.edit')}
+                        ariaLabel={t('common.edit')}
+                      >
+                        <IconEdit className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => beginDuplicate(r)}
+                        title={t('paths.actions.duplicate')}
+                        ariaLabel={t('paths.actions.duplicate')}
+                      >
+                        <IconDuplicate className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="danger"
+                        size="icon"
+                        onClick={() => askDelete(r)}
+                        disabled={del.isPending}
+                        title={t('common.delete')}
+                        ariaLabel={t('common.delete')}
+                      >
+                        <IconTrash className="h-4 w-4" />
+                      </Button>
+                    </div>
+                    <div className="lg:hidden">
+                      <ActionMenu
+                        ariaLabel={t('common.actions')}
+                        items={[
+                          { label: t('paths.actions.copyUrl'), onClick: () => void copyUrl(r) },
+                          { label: t('common.edit'), onClick: () => beginEdit(r) },
+                          { label: t('paths.actions.duplicate'), onClick: () => beginDuplicate(r) },
+                          { label: t('common.delete'), onClick: () => askDelete(r), tone: 'danger', disabled: del.isPending },
+                        ]}
+                      />
+                    </div>
                   </div>
                 ),
               },
             ]}
             mobileCard={(r) => (
               <div className="grid gap-2">
-                <div className="flex items-center justify-between">
-                  <MethodBadge method={r.method} />
-                  {r.enabled ? <Badge tone="success">{t('common.enabled')}</Badge> : <Badge tone="danger">{t('common.disabled')}</Badge>}
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="shrink-0">
+                    <MethodBadge method={r.method} />
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    {r.enabled ? <Badge tone="success">{t('common.enabled')}</Badge> : <Badge tone="danger">{t('common.disabled')}</Badge>}
+                    <ActionMenu
+                      ariaLabel={t('common.actions')}
+                      items={[
+                        { label: t('paths.actions.copyUrl'), onClick: () => void copyUrl(r) },
+                        { label: t('common.edit'), onClick: () => beginEdit(r) },
+                        { label: t('paths.actions.duplicate'), onClick: () => beginDuplicate(r) },
+                        { label: t('common.delete'), onClick: () => askDelete(r), tone: 'danger', disabled: del.isPending },
+                      ]}
+                    />
+                  </div>
                 </div>
                 <div className="text-sm font-medium text-white/90">{r.name}</div>
                 <div className="text-xs text-white/60">{apiLabelById[r.apiId] ?? r.apiId}</div>
                 <div className="text-sm font-medium text-white/90">{renderTemplateWithBoldVars(r.publicPath)}</div>
                 <div className="text-xs text-white/60 break-words">
                   {renderTemplateWithBoldVars(r.targetUrlTemplate)}
-                </div>
-                <div className="mt-2 flex items-center gap-2">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => void copyUrl(r)}
-                    title={t('paths.actions.copyUrl')}
-                    ariaLabel={t('paths.actions.copyUrl')}
-                  >
-                    <IconCopy className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => beginEdit(r)}
-                    title={t('common.edit')}
-                    ariaLabel={t('common.edit')}
-                  >
-                    <IconEdit className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => beginDuplicate(r)}
-                    title={t('paths.actions.duplicate')}
-                    ariaLabel={t('paths.actions.duplicate')}
-                  >
-                    <IconDuplicate className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="danger"
-                    size="icon"
-                    onClick={() => askDelete(r)}
-                    disabled={del.isPending}
-                    title={t('common.delete')}
-                    ariaLabel={t('common.delete')}
-                  >
-                    <IconTrash className="h-4 w-4" />
-                  </Button>
                 </div>
               </div>
             )}
@@ -1071,7 +1064,7 @@ export default function PathsPage() {
             </div>
           ) : null}
 
-          <div className="sm:col-span-2 grid gap-3 sm:grid-cols-3">
+          <div className="sm:col-span-2 grid gap-3 sm:grid-cols-4">
             <div>
               <div className="text-xs font-medium text-white/70">{t('paths.form.enabled')}</div>
               <div className="mt-2 flex items-center gap-2">
@@ -1105,6 +1098,22 @@ export default function PathsPage() {
             </div>
 
             <div>
+              <div className="text-xs font-medium text-white/70">Repassar headers</div>
+              <div className="mt-2 flex items-center gap-2">
+                <button
+                  type="button"
+                  className="inline-flex h-10 w-full items-center justify-between gap-2 rounded-xl border border-white/10 bg-white/5 px-3 text-sm text-white/80"
+                  onClick={() => setForwardClientHeaders((p: boolean) => !p)}
+                >
+                  <span className="flex items-center gap-2">
+                    <span className={`h-2.5 w-2.5 rounded-full ${forwardClientHeaders ? 'bg-emerald-400' : 'bg-rose-400'}`} />
+                    {forwardClientHeaders ? t('common.enabled') : t('common.disabled')}
+                  </span>
+                </button>
+              </div>
+            </div>
+
+            <div>
               <div className="text-xs font-medium text-white/70">{t('paths.form.forwardQuery')}</div>
               <div className="mt-2 flex items-center gap-2">
                 <button
@@ -1118,6 +1127,12 @@ export default function PathsPage() {
                   </span>
                 </button>
               </div>
+            </div>
+          </div>
+
+          <div className="sm:col-span-2">
+            <div className="mt-2 text-xs text-white/50">
+              Quando ativo, headers do cliente são repassados para o endpoint destino (com exceção de headers bloqueados e do header de API-KEY).
             </div>
           </div>
 

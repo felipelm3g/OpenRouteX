@@ -225,6 +225,7 @@ export class PathsService {
       addHeaders,
       addQuery,
       forwardClientQuery: dto.forwardClientQuery ?? cfg.defaultForwardClientQuery,
+      forwardClientHeaders: dto.forwardClientHeaders ?? true,
       authId: authInlineType ? null : authId,
       authInlineType: authInlineType || null,
       authInlineConfig: authInlineType ? (authInlineConfig ?? {}) : null,
@@ -246,6 +247,7 @@ export class PathsService {
     Object.assign(path, dto);
     if (dto.addHeaders) path.addHeaders = dto.addHeaders;
     if (dto.addQuery) path.addQuery = dto.addQuery;
+    if (dto.forwardClientHeaders !== undefined) (path as any).forwardClientHeaders = dto.forwardClientHeaders;
     const requireClientAuth = path.requireClientAuth ?? true;
     this.assertNoVariablesWhenPublic({
       requireClientAuth,

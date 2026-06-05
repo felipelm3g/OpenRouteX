@@ -65,6 +65,10 @@ export class CreatePathDto {
   forwardClientQuery?: boolean;
 
   @IsOptional()
+  @IsBoolean()
+  forwardClientHeaders?: boolean;
+
+  @IsOptional()
   @IsInt()
   @Min(1)
   @Max(600)
@@ -137,6 +141,10 @@ export class UpdatePathDto {
   @IsOptional()
   @IsBoolean()
   forwardClientQuery?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  forwardClientHeaders?: boolean;
 
   @IsOptional()
   @IsInt()

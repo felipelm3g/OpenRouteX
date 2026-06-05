@@ -1,7 +1,7 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
-import { useEffect, useMemo, useState } from 'react';
+import { Fragment, useEffect, useMemo, useState } from 'react';
 
 import { DataTable } from '@/components/data-table';
 import { useI18n } from '@/components/i18n-provider';
@@ -128,16 +128,31 @@ function formatLatency(ms: number | null | undefined, unit: LatencyUnit) {
 }
 
 function parseDateTimeLocal(s: string) {
-  const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/.exec(s);
-  if (!m) return null;
-  return {
-    year: Number(m[1]),
-    month: Number(m[2]),
-    day: Number(m[3]),
-    hour: Number(m[4]),
-    minute: Number(m[5]),
-    second: 0,
-  };
+  const raw = String(s ?? '').trim();
+  if (!raw) return null;
+
+  const parts = raw.split('T');
+  if (parts.length !== 2) return null;
+
+  const [datePart, timePartRaw] = parts;
+  const d = datePart.split('-').map((x) => Number(x));
+  if (d.length !== 3 || d.some((x) => !Number.isFinite(x))) return null;
+
+  const timePart = timePartRaw.replace(/Z$/i, '');
+  const t = timePart.split(':').map((x) => Number(x));
+  if (t.length < 2 || t.length > 3 || t.some((x) => !Number.isFinite(x))) return null;
+
+  const [year, month, day] = d;
+  const [hour, minute] = t;
+  const second = t.length === 3 ? t[2] : 0;
+
+  if (month < 1 || month > 12) return null;
+  if (day < 1 || day > 31) return null;
+  if (hour < 0 || hour > 23) return null;
+  if (minute < 0 || minute > 59) return null;
+  if (second < 0 || second > 59) return null;
+
+  return { year, month, day, hour, minute, second };
 }
 
 function getTzParts(dateUtc: Date, timeZone: string) {
@@ -500,21 +515,23 @@ export default function DashboardPage() {
           title={t('dashboard.filters.title')}
           description={t('dashboard.filters.description')}
           right={
-            <div className="flex items-center gap-2">
-              <Button variant="secondary" size="sm" onClick={() => void downloadLogs('csv')}>
-                {t('common.exportCsv')}
-              </Button>
-              <Button variant="secondary" size="sm" onClick={() => void downloadLogs('json')}>
-                {t('common.exportJson')}
-              </Button>
-              <div className="text-xs text-white/55">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-2">
+              <div className="flex items-center gap-2">
+                <Button variant="secondary" size="sm" onClick={() => void downloadLogs('csv')}>
+                  {t('common.exportCsv')}
+                </Button>
+                <Button variant="secondary" size="sm" onClick={() => void downloadLogs('json')}>
+                  {t('common.exportJson')}
+                </Button>
+              </div>
+              <div className="text-xs text-white/55 sm:text-right">
                 {listQ.isPending ? 'Carregando…' : `Atualiza a cada ${Math.max(1, Math.round(logsRefetch / 1000))}s`}
               </div>
             </div>
           }
         />
         <CardBody>
-          <div className="grid gap-3 lg:grid-cols-6">
+          <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6">
             <Select value={api} onChange={setApi} options={apiOptions} />
             <Select value={path} onChange={setPath} options={pathOptions} />
             <Select value={status} onChange={setStatus} options={statusOptions} />
@@ -525,7 +542,7 @@ export default function DashboardPage() {
         </CardBody>
       </Card>
 
-      <div className="grid gap-4 lg:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Card className="lg:col-span-1">
           <CardHeader title={t('dashboard.cards.requests.title')} description={t('dashboard.cards.requests.description')} />
           <CardBody>
@@ -861,7 +878,7 @@ export default function DashboardPage() {
             const maxTotal = Math.max(1, ...cells.map((c) => c.total));
             const maxErrors = Math.max(1, ...cells.map((c) => c.errors));
 
-            const cellBox = 'h-5 w-5 rounded-md border border-white/10';
+            const cellBox = 'h-4 w-4 rounded-md border border-white/10 sm:h-5 sm:w-5';
             const heatColor = (v: number, max: number, base: 'accent' | 'danger') => {
               const ratio = max <= 0 ? 0 : v / max;
               const a = Math.min(0.9, Math.max(0.06, ratio * 0.9));
@@ -871,8 +888,8 @@ export default function DashboardPage() {
 
             const grid = (kind: 'total' | 'errors') => (
               <div className="overflow-auto">
-                <div className="min-w-[720px]">
-                  <div className="grid grid-cols-[48px_repeat(24,1fr)] gap-1">
+                <div className="min-w-[640px] sm:min-w-[720px]">
+                  <div className="grid grid-cols-[40px_repeat(24,1fr)] gap-1 sm:grid-cols-[48px_repeat(24,1fr)]">
                     <div />
                     {hours.map((h) => (
                       <div key={h} className="text-center text-[10px] text-white/45">
@@ -880,7 +897,7 @@ export default function DashboardPage() {
                       </div>
                     ))}
                     {days.map((d) => (
-                      <>
+                      <Fragment key={d.key}>
                         <div key={`lbl-${d.key}`} className="flex items-center text-xs text-white/70">
                           {d.label}
                         </div>
@@ -902,7 +919,7 @@ export default function DashboardPage() {
                             />
                           );
                         })}
-                      </>
+                      </Fragment>
                     ))}
                   </div>
                 </div>

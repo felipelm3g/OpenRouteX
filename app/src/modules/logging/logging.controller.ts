@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Query, Res } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Query, Res } from '@nestjs/common';
 import { Response } from 'express';
 
 import { LoggingService } from './logging.service';
@@ -6,6 +6,12 @@ import { LoggingService } from './logging.service';
 @Controller('/admin/logs')
 export class LoggingController {
   constructor(private readonly logs: LoggingService) {}
+
+  private normalizeApiSlug(input: string | undefined) {
+    const s = String(input ?? '').trim();
+    if (!s) return undefined;
+    return s.replace(/^\/+/, '').replace(/\/+$/, '').toLowerCase();
+  }
 
   @Get('meta')
   meta(
@@ -15,19 +21,25 @@ export class LoggingController {
     @Query('from') from?: string,
     @Query('to') to?: string,
   ) {
+    const api = this.normalizeApiSlug(apiSlug);
     const fromDate = from ? new Date(from) : undefined;
     const toDate = to ? new Date(to) : undefined;
     const statusRaw = String(status ?? '').trim();
     const statusNum = statusRaw && /^\d+$/.test(statusRaw) ? Number(statusRaw) : null;
     const statusClass = statusNum === null && statusRaw ? statusRaw.toLowerCase() : undefined;
     return this.logs.meta({
-      apiSlug,
+      apiSlug: api,
       publicPath,
       statusCode: statusNum === null ? undefined : statusNum,
       status: statusClass,
       from: fromDate && !Number.isNaN(fromDate.getTime()) ? fromDate : undefined,
       to: toDate && !Number.isNaN(toDate.getTime()) ? toDate : undefined,
     });
+  }
+
+  @Post('purge')
+  purge(@Body() body: { confirm?: string }) {
+    return this.logs.purgeAllLogs(body?.confirm ?? '');
   }
 
   @Get()
@@ -40,10 +52,11 @@ export class LoggingController {
     @Query('to') to?: string,
     @Query('limit') limit?: string,
   ) {
+    const api = this.normalizeApiSlug(apiSlug);
     const fromDate = from ? new Date(from) : undefined;
     const toDate = to ? new Date(to) : undefined;
     return this.logs.list({
-      apiSlug,
+      apiSlug: api,
       apiKey,
       publicPath,
       statusCode: status ? Number(status) : undefined,
@@ -65,6 +78,7 @@ export class LoggingController {
     @Query('to') to?: string,
     @Query('limit') limit?: string,
   ) {
+    const api = this.normalizeApiSlug(apiSlug);
     const fromDate = from ? new Date(from) : undefined;
     const toDate = to ? new Date(to) : undefined;
     const fmt = String(format ?? 'json').toLowerCase();
@@ -74,7 +88,7 @@ export class LoggingController {
       statusNum === null && statusRaw ? statusRaw.toLowerCase() : undefined;
 
     const rows = await this.logs.exportList({
-      apiSlug,
+      apiSlug: api,
       apiKey,
       publicPath,
       status: statusClass,
@@ -146,13 +160,14 @@ export class LoggingController {
     @Query('to') to?: string,
     @Query('limit') limit?: string,
   ) {
+    const api = this.normalizeApiSlug(apiSlug);
     const fromDate = from ? new Date(from) : undefined;
     const toDate = to ? new Date(to) : undefined;
     const statusRaw = String(status ?? '').trim();
     const statusNum = statusRaw && /^\d+$/.test(statusRaw) ? Number(statusRaw) : null;
     const statusClass = statusNum === null && statusRaw ? statusRaw.toLowerCase() : undefined;
     return this.logs.endpointReport({
-      apiSlug,
+      apiSlug: api,
       publicPath,
       method,
       statusCode: statusNum === null ? undefined : statusNum,
@@ -171,10 +186,11 @@ export class LoggingController {
     @Query('to') to?: string,
     @Query('tz') tz?: string,
   ) {
+    const api = this.normalizeApiSlug(apiSlug);
     const fromDate = from ? new Date(from) : undefined;
     const toDate = to ? new Date(to) : undefined;
     return this.logs.heatmap({
-      apiSlug,
+      apiSlug: api,
       publicPath,
       timezone: tz,
       from: fromDate && !Number.isNaN(fromDate.getTime()) ? fromDate : undefined,

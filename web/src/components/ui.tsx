@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { createContext, forwardRef, useCallback, useContext, useMemo, useState } from 'react';
+import { createContext, forwardRef, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 
 export function cn(...parts: Array<string | false | null | undefined>) {
   return parts.filter(Boolean).join(' ');
@@ -19,7 +19,7 @@ export function PageShell({
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex flex-1 flex-col gap-5 p-5 sm:p-6 lg:p-8">
+    <div className="flex flex-1 flex-col gap-5 p-4 sm:p-6 lg:p-8">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div className="space-y-1">
           <h1 className="text-xl font-semibold tracking-tight text-zinc-50 sm:text-2xl">
@@ -220,6 +220,87 @@ export function MethodBadge({ method }: { method: string }) {
                 ? 'border-fuchsia-400/20 bg-fuchsia-400/10 text-fuchsia-300'
                 : 'border-white/15 bg-white/5 text-zinc-200';
   return <span className={cn(base, toneCls)}>{label}</span>;
+}
+
+export function ActionMenu({
+  items,
+  ariaLabel = 'Ações',
+}: {
+  items: Array<{
+    label: string;
+    onClick: () => void;
+    disabled?: boolean;
+    tone?: 'danger' | 'default';
+    hidden?: boolean;
+  }>;
+  ariaLabel?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement | null>(null);
+  const visible = useMemo(() => items.filter((x) => !x.hidden), [items]);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: MouseEvent) => {
+      const el = ref.current;
+      if (!el) return;
+      if (el.contains(e.target as Node)) return;
+      setOpen(false);
+    };
+    window.addEventListener('mousedown', onDown);
+    return () => window.removeEventListener('mousedown', onDown);
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOpen(false);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [open]);
+
+  if (!visible.length) return null;
+
+  return (
+    <div ref={ref} className="relative inline-flex">
+      <Button
+        variant="secondary"
+        size="icon"
+        onClick={() => setOpen((v) => !v)}
+        title={ariaLabel}
+        ariaLabel={ariaLabel}
+      >
+        <span className="text-lg leading-none">⋯</span>
+      </Button>
+      {open ? (
+        <div className="absolute right-0 top-full z-50 mt-2 w-48 overflow-hidden rounded-xl border border-white/12 bg-[#070a18] shadow-[0_20px_60px_rgba(0,0,0,0.55)]">
+          <div className="grid">
+            {visible.map((it, idx) => {
+              const danger = it.tone === 'danger';
+              return (
+                <button
+                  key={`${idx}-${it.label}`}
+                  type="button"
+                  disabled={it.disabled}
+                  onClick={() => {
+                    setOpen(false);
+                    it.onClick();
+                  }}
+                  className={cn(
+                    'w-full px-4 py-2 text-left text-sm text-white/85 hover:bg-white/6 disabled:opacity-60 disabled:pointer-events-none',
+                    danger && 'text-rose-200 hover:bg-rose-500/10',
+                  )}
+                >
+                  {it.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
 }
 
 type ToastItem = { id: string; title: string; description?: string; tone: 'success' | 'danger' | 'neutral' };

@@ -53,6 +53,14 @@ function normalizeOutgoingHeaders(
   return out;
 }
 
+function normalizePublicPath(input: string): string {
+  const s = String(input ?? '').trim();
+  if (!s) return '/';
+  const withLeading = s.startsWith('/') ? s : `/${s}`;
+  const noTrailing = withLeading.replace(/\/+$/, '');
+  return noTrailing || '/';
+}
+
 @Injectable()
 export class ProxyService {
   constructor(
@@ -73,7 +81,7 @@ export class ProxyService {
     params: { apiSlug: string; publicPath: string },
   ) {
     const apiSlug = String(params.apiSlug ?? '').trim().replace(/^\/+/, '').replace(/\/+$/, '').toLowerCase();
-    const publicPath = String(params.publicPath ?? '/');
+    const publicPath = normalizePublicPath(params.publicPath ?? '/');
     if (!apiSlug) throw new BadRequestException('URL inválida. Use /{api}/{path}.');
 
     const requestId = randomUUID();
@@ -206,7 +214,8 @@ export class ProxyService {
       };
 
       const targetTemplate = path.targetUrlTemplate;
-      const clientHeaders = normalizeOutgoingHeaders(req.headers, blocked);
+      const clientHeaders =
+        (path as any).forwardClientHeaders === false ? {} : normalizeOutgoingHeaders(req.headers, blocked);
 
       const clientQuery: Record<string, string> = {};
       if (path.forwardClientQuery !== false) {

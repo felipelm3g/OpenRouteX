@@ -6,7 +6,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { DataTable } from '@/components/data-table';
 import { useI18n } from '@/components/i18n-provider';
 import { ConfirmModal, Modal } from '@/components/modal';
-import { Badge, Button, Card, CardBody, CardHeader, PageShell, Select, TextInput, useToast } from '@/components/ui';
+import { ActionMenu, Badge, Button, Card, CardBody, CardHeader, PageShell, Select, TextInput, useToast } from '@/components/ui';
 import { apiFetch } from '@/lib/api';
 
 type AuthType =
@@ -266,26 +266,37 @@ export default function AuthenticationPage() {
                 key: 'id',
                 header: t('common.actions'),
                 render: (r) => (
-                  <div className="flex items-center gap-2">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => beginEdit(r)}
-                      title={t('common.edit')}
-                      ariaLabel={t('common.edit')}
-                    >
-                      <IconEdit className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="danger"
-                      size="icon"
-                      onClick={() => askDelete(r)}
-                      disabled={del.isPending}
-                      title={t('common.delete')}
-                      ariaLabel={t('common.delete')}
-                    >
-                      <IconTrash className="h-4 w-4" />
-                    </Button>
+                  <div className="flex items-center justify-end">
+                    <div className="hidden items-center gap-2 lg:flex">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => beginEdit(r)}
+                        title={t('common.edit')}
+                        ariaLabel={t('common.edit')}
+                      >
+                        <IconEdit className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="danger"
+                        size="icon"
+                        onClick={() => askDelete(r)}
+                        disabled={del.isPending}
+                        title={t('common.delete')}
+                        ariaLabel={t('common.delete')}
+                      >
+                        <IconTrash className="h-4 w-4" />
+                      </Button>
+                    </div>
+                    <div className="lg:hidden">
+                      <ActionMenu
+                        ariaLabel={t('common.actions')}
+                        items={[
+                          { label: t('common.edit'), onClick: () => beginEdit(r) },
+                          { label: t('common.delete'), onClick: () => askDelete(r), tone: 'danger', disabled: del.isPending },
+                        ]}
+                      />
+                    </div>
                   </div>
                 ),
               },

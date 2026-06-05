@@ -1,6 +1,6 @@
 import { brotliDecompressSync, gunzipSync, inflateRawSync, inflateSync } from 'zlib';
 
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 
@@ -25,14 +25,40 @@ export class LoggingService {
     return input.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   }
 
-  private publicPathTemplateToRegex(template: string): string {
+  private publicPathExactToRegex(path: string, opts?: { allowMissingLeadingSlash?: boolean; allowTrailingSlash?: boolean }): string {
+    const normalized = this.normalizePublicPath(path);
+    const allowMissingLeadingSlash = opts?.allowMissingLeadingSlash === true;
+    const allowTrailingSlash = opts?.allowTrailingSlash === true;
+
+    if (normalized === '/') return '^/?$';
+
+    const body = normalized.startsWith('/') ? normalized.slice(1) : normalized;
+    return `^${allowMissingLeadingSlash ? '/?' : '/'}${this.escapeRegex(body)}${allowTrailingSlash ? '\\/?' : ''}$`;
+  }
+
+  private publicPathTemplateToRegex(
+    template: string,
+    opts?: { allowMissingLeadingSlash?: boolean; allowTrailingSlash?: boolean },
+  ): string {
     const normalized = this.normalizePublicPath(template);
+    const allowMissingLeadingSlash = opts?.allowMissingLeadingSlash === true;
+    const allowTrailingSlash = opts?.allowTrailingSlash === true;
+
     const hasBraces = normalized.includes('{') && normalized.includes('}');
     const hasStars = normalized.includes('*');
-    if (!hasBraces && !hasStars) return `^${this.escapeRegex(normalized)}$`;
+    if (!hasBraces && !hasStars) return this.publicPathExactToRegex(normalized, opts);
+
+    if (normalized === '/') return '^/?$';
 
     let pattern = '^';
     let i = 0;
+    if (allowMissingLeadingSlash) {
+      if (normalized.startsWith('/')) {
+        pattern += '/?';
+        i = 1;
+      }
+    }
+
     while (i < normalized.length) {
       const ch = normalized[i]!;
       if (ch === '{') {
@@ -54,20 +80,17 @@ export class LoggingService {
       pattern += this.escapeRegex(ch);
       i += 1;
     }
-    pattern += '$';
+    pattern += allowTrailingSlash ? '\\/?$' : '$';
     return pattern;
   }
 
   private applyPublicPathFilter(qb: ReturnType<Repository<RequestLogEntity>['createQueryBuilder']>, raw: string) {
     const normalized = this.normalizePublicPath(raw);
     const isTemplate = normalized.includes('{') || normalized.includes('*');
-    if (!isTemplate) {
-      qb.andWhere('l.publicPath = :publicPath', { publicPath: normalized });
-      return;
-    }
-    qb.andWhere('l.publicPath ~ :publicPathRe', {
-      publicPathRe: this.publicPathTemplateToRegex(normalized),
-    });
+    const publicPathRe = isTemplate
+      ? this.publicPathTemplateToRegex(normalized, { allowMissingLeadingSlash: true, allowTrailingSlash: true })
+      : this.publicPathExactToRegex(normalized, { allowMissingLeadingSlash: true, allowTrailingSlash: true });
+    qb.andWhere('l.publicPath ~ :publicPathRe', { publicPathRe });
   }
 
   private headerValue(headers: Record<string, string | string[]> | null | undefined, key: string) {
@@ -188,6 +211,15 @@ export class LoggingService {
       requestBody,
     });
     return this.logRepo.save(log);
+  }
+
+  async purgeAllLogs(confirm: string) {
+    const c = String(confirm ?? '').trim();
+    if (c !== 'DELETE') {
+      throw new BadRequestException('Confirmação inválida. Digite DELETE (maiúsculo) para limpar os logs.');
+    }
+    await this.logRepo.query('TRUNCATE TABLE request_logs');
+    return { ok: true };
   }
 
   async finalizeLog(id: string, params: {
@@ -369,9 +401,12 @@ export class LoggingService {
     if (params?.apiSlug) qb.andWhere('l.apiSlug = :apiSlug', { apiSlug: params.apiSlug });
     if (params?.publicPath) this.applyPublicPathFilter(qb, params.publicPath);
 
+    const dowExpr = "EXTRACT(DOW FROM (l.createdAt AT TIME ZONE :tz))::int";
+    const hourExpr = "EXTRACT(HOUR FROM (l.createdAt AT TIME ZONE :tz))::int";
+
     const rows = await qb
-      .select("EXTRACT(DOW FROM (l.createdAt AT TIME ZONE :tz))::int", 'dow')
-      .addSelect("EXTRACT(HOUR FROM (l.createdAt AT TIME ZONE :tz))::int", 'hour')
+      .select(dowExpr, 'dow')
+      .addSelect(hourExpr, 'hour')
       .addSelect('COUNT(*)', 'total')
       .addSelect(
         'SUM(CASE WHEN l.statusCode IS NULL OR l.statusCode < 200 OR l.statusCode >= 300 THEN 1 ELSE 0 END)',
@@ -379,8 +414,8 @@ export class LoggingService {
       )
       .andWhere('l.createdAt IS NOT NULL')
       .setParameter('tz', tz)
-      .groupBy('dow')
-      .addGroupBy('hour')
+      .groupBy(dowExpr)
+      .addGroupBy(hourExpr)
       .orderBy('dow', 'ASC')
       .addOrderBy('hour', 'ASC')
       .getRawMany<{ dow: number; hour: number; total: string; errors: string }>();

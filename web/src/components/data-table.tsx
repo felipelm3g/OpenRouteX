@@ -170,8 +170,8 @@ export function DataTable<T>({
         </div>
       ) : null}
 
-      <div className="overflow-hidden rounded-2xl border border-white/10 bg-white/5">
-      <div className="hidden overflow-x-auto lg:block">
+      <div className="overflow-visible rounded-2xl border border-white/10 bg-white/5 md:overflow-hidden">
+      <div className="hidden overflow-x-auto md:block">
         <table className="w-full text-left text-sm">
           <thead className="border-b border-white/10 bg-white/5 text-xs text-white/70">
             <tr>
@@ -209,7 +209,7 @@ export function DataTable<T>({
         </table>
       </div>
 
-      <div className="grid gap-3 p-3 lg:hidden">
+      <div className="grid gap-3 p-3 md:hidden">
         {pageRows.map((row) => (
           <div
             key={keyField(row)}

@@ -55,6 +55,9 @@ export class PathEntity {
   @Column({ type: 'boolean', default: true })
   forwardClientQuery!: boolean;
 
+  @Column({ type: 'boolean', default: true })
+  forwardClientHeaders!: boolean;
+
   @Column({ type: 'int', nullable: true })
   timeoutSeconds!: number | null;
 

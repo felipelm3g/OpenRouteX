@@ -1,9 +1,10 @@
 'use client';
 
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
 
 import { useI18n } from '@/components/i18n-provider';
+import { ConfirmModal } from '@/components/modal';
 import { Button, Card, CardBody, CardHeader, PageShell, Select, TextInput, useToast } from '@/components/ui';
 import { apiFetch } from '@/lib/api';
 import { env } from '@/lib/env';
@@ -76,6 +77,7 @@ const ALLOWED_TIMEZONES: string[] = [
 export default function SettingsPage() {
   const toast = useToast();
   const { t, language: currentLanguage, setLanguage: setLanguageGlobal } = useI18n();
+  const queryClient = useQueryClient();
 
   const q = useQuery({
     queryKey: ['settings'],
@@ -123,6 +125,8 @@ export default function SettingsPage() {
   const [smtpFrom, setSmtpFrom] = useState('');
   const [smtpTlsRejectUnauthorized, setSmtpTlsRejectUnauthorized] = useState('true');
   const [testTo, setTestTo] = useState('');
+  const [purgeOpen, setPurgeOpen] = useState(false);
+  const [purgeConfirm, setPurgeConfirm] = useState('');
 
   useEffect(() => {
     if (!q.data) return;
@@ -259,6 +263,23 @@ export default function SettingsPage() {
     onSuccess: () => toast.success(t('common.sent'), t('settings.testEmail.sent')),
     onError: (e: unknown) =>
       toast.error(t('common.failure'), (e as { message?: string })?.message ?? t('common.failure')),
+  });
+
+  const purgeLogs = useMutation({
+    mutationFn: async () => {
+      return apiFetch<{ ok: true }>('/admin/logs/purge', {
+        method: 'POST',
+        body: JSON.stringify({ confirm: purgeConfirm }),
+      });
+    },
+    onSuccess: async () => {
+      toast.success('Logs limpos', 'Todos os logs do dashboard foram removidos.');
+      setPurgeOpen(false);
+      setPurgeConfirm('');
+      await queryClient.invalidateQueries();
+    },
+    onError: (e: unknown) =>
+      toast.error('Erro', (e as { message?: string })?.message ?? t('common.failure')),
   });
 
   const tzOptions = (() => {
@@ -399,13 +420,18 @@ export default function SettingsPage() {
             <div>
               <div className="text-xs font-medium text-white/70">{t('settings.dashboard.colorize')}</div>
               <div className="mt-2">
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => setDashboardColorizeEnabled((v) => (v === 'true' ? 'false' : 'true'))}
-                >
-                  {dashboardColorizeEnabled === 'true' ? t('common.enabled') : t('common.disabled')}
-                </Button>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => setDashboardColorizeEnabled((v) => (v === 'true' ? 'false' : 'true'))}
+                  >
+                    {dashboardColorizeEnabled === 'true' ? t('common.enabled') : t('common.disabled')}
+                  </Button>
+                  <Button variant="danger" size="sm" onClick={() => setPurgeOpen(true)}>
+                    Limpar logs
+                  </Button>
+                </div>
               </div>
               <div className="mt-2 text-xs text-white/55">{t('settings.dashboard.colorize.help')}</div>
             </div>
@@ -640,6 +666,34 @@ export default function SettingsPage() {
           </div>
         </CardBody>
       </Card>
+
+      <ConfirmModal
+        open={purgeOpen}
+        onClose={() => {
+          if (purgeLogs.isPending) return;
+          setPurgeOpen(false);
+          setPurgeConfirm('');
+        }}
+        title="Limpar logs do dashboard"
+        description='Esta ação remove TODOS os logs armazenados no banco e zera os dados exibidos no Dashboard. Para confirmar, digite "DELETE" (maiúsculo).'
+        confirmText="Limpar"
+        onConfirm={() => {
+          if (purgeConfirm !== 'DELETE') {
+            toast.error('Confirmação inválida', 'Digite DELETE (maiúsculo) para continuar.');
+            return;
+          }
+          purgeLogs.mutate();
+        }}
+        confirmDisabled={purgeLogs.isPending}
+      >
+        <div className="grid gap-2">
+          <div className="text-xs font-medium text-white/70">Confirmação</div>
+          <TextInput value={purgeConfirm} onChange={setPurgeConfirm} placeholder="DELETE" />
+          {purgeConfirm && purgeConfirm !== 'DELETE' ? (
+            <div className="text-xs text-rose-300">Digite DELETE em maiúsculo.</div>
+          ) : null}
+        </div>
+      </ConfirmModal>
     </PageShell>
   );
 }
