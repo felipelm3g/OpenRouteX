@@ -26,6 +26,7 @@ const PERMISSIONS: Array<{ key: string; labelKey: string }> = [
   { key: 'paths', labelKey: 'nav.paths' },
   { key: 'apikeys', labelKey: 'nav.apiKeys' },
   { key: 'certificates', labelKey: 'nav.certificates' },
+  { key: 'import_export', labelKey: 'nav.importExport' },
   { key: 'users', labelKey: 'nav.users' },
   { key: 'settings', labelKey: 'nav.settings' },
 ];

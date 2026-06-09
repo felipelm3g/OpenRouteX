@@ -192,6 +192,51 @@ function zonedDateTimeLocalToUtcIso(local: string, timeZone: string) {
   return guess.toISOString();
 }
 
+function pad2(n: number) {
+  return String(n).padStart(2, '0');
+}
+
+function formatDateTimeLocalValue(parts: {
+  year: number;
+  month: number;
+  day: number;
+  hour: number;
+  minute: number;
+}) {
+  return `${parts.year}-${pad2(parts.month)}-${pad2(parts.day)}T${pad2(parts.hour)}:${pad2(parts.minute)}`;
+}
+
+function utcDateToZonedDateTimeLocal(dateUtc: Date, timeZone: string) {
+  const p = getTzParts(dateUtc, timeZone);
+  return formatDateTimeLocalValue({
+    year: p.year,
+    month: p.month,
+    day: p.day,
+    hour: p.hour,
+    minute: p.minute,
+  });
+}
+
+function shiftZonedDateTimeLocal(local: string, hours: number, timeZone: string) {
+  const iso = zonedDateTimeLocalToUtcIso(local, timeZone);
+  if (!iso) return local;
+  const shifted = new Date(new Date(iso).getTime() + hours * 60 * 60 * 1000);
+  return utcDateToZonedDateTimeLocal(shifted, timeZone);
+}
+
+function buildDefaultRange(timeZone: string) {
+  const now = getTzParts(new Date(), timeZone);
+  const from = formatDateTimeLocalValue({
+    year: now.year,
+    month: now.month,
+    day: now.day,
+    hour: 0,
+    minute: 0,
+  });
+  const to = shiftZonedDateTimeLocal(from, 24, timeZone);
+  return { from, to };
+}
+
 export default function DashboardPage() {
   const { t } = useI18n();
   const toast = useToast();
@@ -216,6 +261,7 @@ export default function DashboardPage() {
   const [to, setTo] = useState('');
   const [openId, setOpenId] = useState<string | null>(null);
   const [openFromUrl, setOpenFromUrl] = useState('');
+  const hasValidRange = Boolean(from && to && zonedDateTimeLocalToUtcIso(from, tz) && zonedDateTimeLocalToUtcIso(to, tz));
 
   const apisQ = useQuery({
     queryKey: ['apis'],
@@ -261,14 +307,53 @@ export default function DashboardPage() {
     return () => clearTimeout(t);
   }, [api]);
 
+  useEffect(() => {
+    if (!tz) return;
+    if (from && to) return;
+    const next = buildDefaultRange(tz);
+    const t = setTimeout(() => {
+      setFrom((prev) => prev || next.from);
+      setTo((prev) => prev || next.to);
+    }, 0);
+    return () => clearTimeout(t);
+  }, [from, to, tz]);
+
+  const handleFromChange = (next: string) => {
+    if (!next) return;
+    setFrom(next);
+    setTo((current) => {
+      if (!current) return shiftZonedDateTimeLocal(next, 24, tz);
+      const nextIso = zonedDateTimeLocalToUtcIso(next, tz);
+      const currentIso = zonedDateTimeLocalToUtcIso(current, tz);
+      if (!nextIso || !currentIso) return current;
+      if (new Date(nextIso).getTime() < new Date(currentIso).getTime()) return current;
+      return shiftZonedDateTimeLocal(next, 24, tz);
+    });
+  };
+
+  const handleToChange = (next: string) => {
+    if (!next) return;
+    setTo(next);
+    setFrom((current) => {
+      if (!current) return shiftZonedDateTimeLocal(next, -24, tz);
+      const nextIso = zonedDateTimeLocalToUtcIso(next, tz);
+      const currentIso = zonedDateTimeLocalToUtcIso(current, tz);
+      if (!nextIso || !currentIso) return current;
+      if (new Date(nextIso).getTime() > new Date(currentIso).getTime()) return current;
+      return shiftZonedDateTimeLocal(next, -24, tz);
+    });
+  };
+
   const metaApisQ = useQuery({
     queryKey: ['logs-meta-apis', status, from, to, tz],
+    enabled: hasValidRange,
     queryFn: () => {
       const qs = new URLSearchParams();
-      const fromIso = from ? zonedDateTimeLocalToUtcIso(from, tz) : null;
-      const toIso = to ? zonedDateTimeLocalToUtcIso(to, tz) : null;
-      if (fromIso) qs.set('from', fromIso);
-      if (toIso) qs.set('to', toIso);
+      const fromIso = zonedDateTimeLocalToUtcIso(from, tz);
+      const toIso = zonedDateTimeLocalToUtcIso(to, tz);
+      if (!fromIso || !toIso) throw new Error('range_required');
+      qs.set('from', fromIso);
+      qs.set('to', toIso);
       if (status) qs.set('status', status);
       return apiFetch<LogsMetaDto>(`/admin/logs/meta?${qs.toString()}`);
     },
@@ -276,30 +361,34 @@ export default function DashboardPage() {
 
   const metaStatusQ = useQuery({
     queryKey: ['logs-meta-status', api, path, status, from, to, tz],
+    enabled: hasValidRange,
     queryFn: () => {
       const qs = new URLSearchParams();
       if (api) qs.set('api', api);
       if (path) qs.set('path', path);
       if (status) qs.set('status', status);
-      const fromIso = from ? zonedDateTimeLocalToUtcIso(from, tz) : null;
-      const toIso = to ? zonedDateTimeLocalToUtcIso(to, tz) : null;
-      if (fromIso) qs.set('from', fromIso);
-      if (toIso) qs.set('to', toIso);
+      const fromIso = zonedDateTimeLocalToUtcIso(from, tz);
+      const toIso = zonedDateTimeLocalToUtcIso(to, tz);
+      if (!fromIso || !toIso) throw new Error('range_required');
+      qs.set('from', fromIso);
+      qs.set('to', toIso);
       return apiFetch<LogsMetaDto>(`/admin/logs/meta?${qs.toString()}`);
     },
   });
 
   const metricsQ = useQuery({
     queryKey: ['metrics', api, path, status, from, to, tz],
+    enabled: hasValidRange,
     queryFn: () => {
       const qs = new URLSearchParams();
       if (api) qs.set('api', api);
       if (path) qs.set('path', path);
       if (status) qs.set('status', status);
-      const fromIso = from ? zonedDateTimeLocalToUtcIso(from, tz) : null;
-      const toIso = to ? zonedDateTimeLocalToUtcIso(to, tz) : null;
-      if (fromIso) qs.set('from', fromIso);
-      if (toIso) qs.set('to', toIso);
+      const fromIso = zonedDateTimeLocalToUtcIso(from, tz);
+      const toIso = zonedDateTimeLocalToUtcIso(to, tz);
+      if (!fromIso || !toIso) throw new Error('range_required');
+      qs.set('from', fromIso);
+      qs.set('to', toIso);
       const suffix = qs.toString();
       return apiFetch<Metrics>(`/admin/metrics${suffix ? `?${suffix}` : ''}`);
     },
@@ -308,16 +397,17 @@ export default function DashboardPage() {
 
   const listQ = useQuery({
     queryKey: ['dashboard-logs', api, path, status, from, to, tz],
+    enabled: hasValidRange,
     queryFn: () => {
       const qs = new URLSearchParams();
       if (api) qs.set('api', api);
       if (path) qs.set('path', path);
       if (status) qs.set('status', status);
-      const fromIso = from ? zonedDateTimeLocalToUtcIso(from, tz) : null;
-      const toIso = to ? zonedDateTimeLocalToUtcIso(to, tz) : null;
-      if (fromIso) qs.set('from', fromIso);
-      if (toIso) qs.set('to', toIso);
-      qs.set('limit', '80');
+      const fromIso = zonedDateTimeLocalToUtcIso(from, tz);
+      const toIso = zonedDateTimeLocalToUtcIso(to, tz);
+      if (!fromIso || !toIso) throw new Error('range_required');
+      qs.set('from', fromIso);
+      qs.set('to', toIso);
       return apiFetch<LogRow[]>(`/admin/logs?${qs.toString()}`);
     },
     refetchInterval: logsRefetch,
@@ -325,30 +415,33 @@ export default function DashboardPage() {
 
   const endpointQ = useQuery({
     queryKey: ['dashboard-endpoints', api, path, status, from, to, tz],
+    enabled: hasValidRange,
     queryFn: () => {
       const qs = new URLSearchParams();
       if (api) qs.set('api', api);
       if (path) qs.set('path', path);
       if (status) qs.set('status', status);
-      const fromIso = from ? zonedDateTimeLocalToUtcIso(from, tz) : null;
-      const toIso = to ? zonedDateTimeLocalToUtcIso(to, tz) : null;
-      if (fromIso) qs.set('from', fromIso);
-      if (toIso) qs.set('to', toIso);
-      qs.set('limit', '200');
+      const fromIso = zonedDateTimeLocalToUtcIso(from, tz);
+      const toIso = zonedDateTimeLocalToUtcIso(to, tz);
+      if (!fromIso || !toIso) throw new Error('range_required');
+      qs.set('from', fromIso);
+      qs.set('to', toIso);
       return apiFetch<EndpointReportRow[]>(`/admin/logs/endpoints?${qs.toString()}`);
     },
   });
 
   const heatmapQ = useQuery({
     queryKey: ['dashboard-heatmap', api, path, from, to, tz],
+    enabled: hasValidRange,
     queryFn: () => {
       const qs = new URLSearchParams();
       if (api) qs.set('api', api);
       if (path) qs.set('path', path);
-      const fromIso = from ? zonedDateTimeLocalToUtcIso(from, tz) : null;
-      const toIso = to ? zonedDateTimeLocalToUtcIso(to, tz) : null;
-      if (fromIso) qs.set('from', fromIso);
-      if (toIso) qs.set('to', toIso);
+      const fromIso = zonedDateTimeLocalToUtcIso(from, tz);
+      const toIso = zonedDateTimeLocalToUtcIso(to, tz);
+      if (!fromIso || !toIso) throw new Error('range_required');
+      qs.set('from', fromIso);
+      qs.set('to', toIso);
       qs.set('tz', tz);
       return apiFetch<HeatmapCell[]>(`/admin/logs/heatmap?${qs.toString()}`);
     },
@@ -473,12 +566,15 @@ export default function DashboardPage() {
     if (api) qs.set('api', api);
     if (path) qs.set('path', path);
     if (status) qs.set('status', status);
-    const fromIso = from ? zonedDateTimeLocalToUtcIso(from, tz) : null;
-    const toIso = to ? zonedDateTimeLocalToUtcIso(to, tz) : null;
-    if (fromIso) qs.set('from', fromIso);
-    if (toIso) qs.set('to', toIso);
+    const fromIso = zonedDateTimeLocalToUtcIso(from, tz);
+    const toIso = zonedDateTimeLocalToUtcIso(to, tz);
+    if (!fromIso || !toIso) {
+      toast.error('Erro', 'Informe um intervalo de datas valido.');
+      return;
+    }
+    qs.set('from', fromIso);
+    qs.set('to', toIso);
     qs.set('format', format);
-    qs.set('limit', '5000');
 
     const token = getCookieValue('orx_token');
     const url = `${env.apiBaseUrl}/admin/logs/export?${qs.toString()}`;
@@ -508,7 +604,7 @@ export default function DashboardPage() {
   return (
     <PageShell
       title="Dashboard"
-      subtitle="Métricas de uso e status operacional (janela de 24h)."
+      subtitle="Métricas de uso e status operacional."
     >
       <Card className="mt-4">
         <CardHeader
@@ -536,8 +632,8 @@ export default function DashboardPage() {
             <Select value={path} onChange={setPath} options={pathOptions} />
             <Select value={status} onChange={setStatus} options={statusOptions} />
             <Select value={latencyUnit} onChange={(v) => setLatencyUnit(v as LatencyUnit)} options={latencyUnitOptions} />
-            <TextInput value={from} onChange={setFrom} placeholder={t('common.from')} type="datetime-local" />
-            <TextInput value={to} onChange={setTo} placeholder={t('common.to')} type="datetime-local" />
+            <TextInput value={from} onChange={handleFromChange} placeholder={t('common.from')} type="datetime-local" />
+            <TextInput value={to} onChange={handleToChange} placeholder={t('common.to')} type="datetime-local" />
           </div>
         </CardBody>
       </Card>
@@ -854,7 +950,7 @@ export default function DashboardPage() {
           description={t('dashboard.heatmap.description')}
           right={
             <div className="text-xs text-white/55">
-              {heatmapQ.isPending ? 'Carregando…' : 'Últimas 24h ou janela selecionada'}
+              {heatmapQ.isPending ? 'Carregando…' : 'Todos os registros ou janela selecionada'}
             </div>
           }
         />

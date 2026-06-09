@@ -204,6 +204,7 @@ async function bootstrap() {
       if (p.startsWith('/auth')) return 'authentication';
       if (p.startsWith('/apikeys')) return 'apikeys';
       if (p.startsWith('/certificates')) return 'certificates';
+      if (p.startsWith('/import-export')) return 'import_export';
       if (p.startsWith('/users')) return 'users';
       return null;
     };

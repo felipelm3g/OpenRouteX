@@ -36,14 +36,15 @@ Header obrigatório:
 Quando uma requisição chega, o OpenRouteX:
 
 1. Resolve a API pelo slug (`/{api}`)
-2. Resolve o Path pelo `publicPath + method`
-3. Valida API Key (multi-tenant context)
-4. Carrega a Auth vinculada ao Path (se existir)
-5. Resolve variáveis `{VAR_NAME}` usando exclusivamente `variableBindings` da API Key
-6. Monta a URL final do sistema externo
-7. Faz a chamada upstream replicando method, query, headers e body (sem alterar payload)
-8. Retorna a resposta upstream sem alterar o body
-9. Registra logs completos do request e response
+2. Resolve o Path pelo `publicPath + method` (inclui suporte a templates no caminho público)
+3. Extrai variáveis do caminho público quando o Path foi cadastrado com `{VAR}` (ex.: `/ler-fatura/{FATURA}`)
+4. Valida API Key (multi-tenant context) e se ela permite acesso ao serviço (slug)
+5. Carrega a Auth vinculada ao Path (se existir) — ou usa Auth inline “Customizada” na própria rota
+6. Resolve variáveis `{VAR_NAME}` usando bindings combinados (Path + Serviço + API Key)
+7. Monta a URL final do sistema externo
+8. Faz a chamada upstream replicando method, query, headers e body (sem alterar payload)
+9. Retorna a resposta upstream sem alterar o body
+10. Registra logs completos do request e response
 
 Importante:
 
@@ -64,10 +65,10 @@ Importante:
 
 Módulos principais:
 
-- `auth`: autenticações reutilizáveis (Bearer, Basic, API Key header, Custom Header, OAuth2 client credentials)
+- `auth`: autenticações reutilizáveis (Bearer, Basic, API Key header, Custom Header, OAuth2/OIDC client credentials, HMAC, OAuth1)
 - `apis`: cadastro de APIs (slug)
-- `paths`: rotas públicas por API + method, com target URL template e auth
-- `apikeys`: API Keys (multi-tenant), com bindings de variáveis e rate limit
+- `paths`: rotas públicas por API + method, com public path dinâmico, URL destino por template e auth
+- `apikeys`: API Keys (multi-tenant), com serviços permitidos, bindings de variáveis e rate limit
 - `variables`: detecção e resolução de `{VAR_NAME}`
 - `proxy`: engine de proxy pass-through
 - `logging`: logs completos (request/response raw)
@@ -83,8 +84,9 @@ Endpoints administrativos (para o dashboard):
 
 - `GET /admin/metrics`
 - CRUD: `/admin/apis`, `/admin/paths`, `/admin/auth`, `/admin/apikeys`
-- Logs: `GET /admin/logs`, `GET /admin/logs/:id`
+- Logs: `GET /admin/logs`, `GET /admin/logs/:id`, `GET /admin/logs/meta`, `GET /admin/logs/endpoints`, `GET /admin/logs/heatmap`, `GET /admin/logs/export`
 - Health: `GET /health`
+ - Limpeza total de logs (Configurações): `POST /admin/logs/purge` (confirmação obrigatória com `DELETE`)
 
 ### Frontend (Next.js) — `/web`
 
@@ -201,7 +203,10 @@ Variáveis seguem o formato:
 
 Regras:
 
-- Variáveis são resolvidas SOMENTE via API Key (`variableBindings`).
+- Variáveis podem vir de 3 fontes:
+  - Path (variáveis extraídas do caminho público quando cadastrado como template, ex.: `/download/{ID}`)
+  - Serviço (`apis.variableBindings`)
+  - API Key (`apikeys.variableBindings`)
 - Variáveis nunca vêm do cliente.
 - Variáveis nunca vêm do body.
 
@@ -210,6 +215,10 @@ Onde podem existir templates com variáveis:
 - `targetUrlTemplate` do Path
 - `addHeaders` do Path
 - `addQuery` do Path
+
+Precedência (segurança):
+
+- Variáveis do **Path** não sobrescrevem variáveis do **Serviço** nem da **API Key**.
 
 Exemplo:
 
@@ -228,6 +237,46 @@ API Key B:
 O mesmo Path gera URLs finais diferentes, dependendo da API Key.
 
 ---
+
+## Rotas Dinâmicas (Public Path com `{VAR}`)
+
+Você pode cadastrar o caminho público com variáveis:
+
+- Ex.: `/ler-fatura/{FATURA}`
+- Ex.: `/download-fatura/{FATURA}/{DOWNLOAD}`
+
+Quando o cliente chama:
+
+`{URL_BACKEND}/billpt/ler-fatura/28248`
+
+o OpenRouteX casa a rota pelo template e extrai `FATURA=28248` para montar a URL destino (e/ou headers/query adicionais).
+
+---
+
+## Método ORIGEM
+
+No cadastro de rota, existe o método **ORIGEM** (internamente `ANY`):
+
+- A rota casa para qualquer método HTTP
+- A chamada upstream usa o mesmo método recebido (GET/POST/PUT/…)
+
+---
+
+## Repassar Headers / Query Params
+
+Por rota, você pode controlar o que é repassado do cliente:
+
+- **Repassar headers**: permite/desativa o repasse de headers do cliente para o upstream (com exceção de headers bloqueados e do header de API-KEY)
+- **Repassar query params**: permite/desativa o repasse de `?a=1&b=2` do cliente para o upstream
+
+---
+
+## Serviços Permitidos por API Key
+
+Por segurança, uma API Key só funciona se tiver pelo menos 1 serviço permitido e se o slug chamado estiver na lista:
+
+- `allowedApis` obrigatório e não vazio
+- Se o slug não estiver em `allowedApis`, o gateway retorna 403
 
 ## Logging (Obrigatório)
 

@@ -44,6 +44,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       paths: '/paths',
       apikeys: '/api-keys',
       certificates: '/certificates',
+      import_export: '/import-export',
       users: '/users',
       settings: '/settings',
     };

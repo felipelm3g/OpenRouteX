@@ -50,6 +50,10 @@ export class UpdateSettingsDto {
   dashboardColorizeEnabled?: boolean;
 
   @IsOptional()
+  @IsBoolean()
+  logsSavePayloadEnabled?: boolean;
+
+  @IsOptional()
   @IsInt()
   @Min(1000)
   @Max(600000)
@@ -58,6 +62,10 @@ export class UpdateSettingsDto {
   @IsOptional()
   @IsBoolean()
   defaultForwardClientQuery?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  defaultForwardClientHeaders?: boolean;
 
   @IsOptional()
   @IsString()
@@ -161,8 +169,10 @@ export type SettingsDto = {
   dashboardMetricsRefetchMs: number;
   dashboardLogsRefetchMs: number;
   dashboardColorizeEnabled: boolean;
+  logsSavePayloadEnabled: boolean;
   proxyTimeoutMs: number;
   defaultForwardClientQuery: boolean;
+  defaultForwardClientHeaders: boolean;
   apiKeyHeaderName: string;
   proxyBlockedHeaders: string[];
   loginMaxAttempts: number;

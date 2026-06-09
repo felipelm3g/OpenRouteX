@@ -213,6 +213,7 @@
   "nav.paths": "Rotas",
   "nav.apiKeys": "Autenticação do cliente",
   "nav.certificates": "Certificados",
+  "nav.importExport": "Import & Export",
   "nav.users": "Usuários",
   "nav.settings": "Configurações",
   "nav.logout": "Logout",

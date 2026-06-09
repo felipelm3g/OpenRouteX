@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 
 import { useI18n } from './i18n-provider';
 import { Badge, cn } from './ui';
@@ -16,6 +16,7 @@ const NAV: NavItem[] = [
   { href: '/paths', key: 'nav.paths' },
   { href: '/api-keys', key: 'nav.apiKeys' },
   { href: '/certificates', key: 'nav.certificates' },
+  { href: '/import-export', key: 'nav.importExport' },
   { href: '/users', key: 'nav.users' },
   { href: '/settings', key: 'nav.settings' },
 ];
@@ -35,10 +36,6 @@ export function AppShell({
   const { t } = useI18n();
   const [mobileOpen, setMobileOpen] = useState(false);
 
-  useEffect(() => {
-    setMobileOpen(false);
-  }, [pathname]);
-
   const nav = useMemo(() => {
     if (isPrimaryAdmin || !permissions) return NAV;
     const keyByHref: Record<string, string> = {
@@ -48,6 +45,7 @@ export function AppShell({
       '/paths': 'paths',
       '/api-keys': 'apikeys',
       '/certificates': 'certificates',
+      '/import-export': 'import_export',
       '/users': 'users',
       '/settings': 'settings',
     };
@@ -167,6 +165,7 @@ export function AppShell({
                     <Link
                       key={item.href}
                       href={item.href}
+                      onClick={() => setMobileOpen(false)}
                       className={cn(
                         'rounded-xl px-3 py-2 text-sm text-white/75 hover:bg-white/6 hover:text-white',
                         active && 'bg-white/8 text-white',

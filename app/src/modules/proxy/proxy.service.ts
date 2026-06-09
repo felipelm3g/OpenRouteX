@@ -128,6 +128,9 @@ export class ProxyService {
     const apiKeyHeader = String(cfg.apiKeyHeaderName ?? 'API-KEY').trim() || 'API-KEY';
     const requireClientAuth = path.requireClientAuth !== false;
     const apiKeyValue = requireClientAuth ? String(req.header(apiKeyHeader) ?? '').trim() : '';
+    const savePayload = cfg.logsSavePayloadEnabled !== false && path.savePayload !== false;
+    const forwardClientHeaders = cfg.defaultForwardClientHeaders !== false && path.forwardClientHeaders !== false;
+    const forwardClientQuery = cfg.defaultForwardClientQuery !== false && path.forwardClientQuery !== false;
     const blocked = new Set<string>([
       ...Array.from(HOP_BY_HOP),
       apiKeyHeader.toLowerCase(),
@@ -141,7 +144,7 @@ export class ProxyService {
       method: req.method,
       originalUrl,
       requestHeaders: toSingleHeaderMap(req.headers),
-      requestBody: Buffer.isBuffer(req.body) ? req.body : null,
+      requestBody: savePayload && Buffer.isBuffer(req.body) ? req.body : null,
       redactHeaders: [apiKeyHeader],
     });
 
@@ -175,7 +178,7 @@ export class ProxyService {
           await this.logs.finalizeLog(baseLog.id, {
             finalUrl: null,
             responseHeaders: { 'content-type': 'application/json' },
-            responseBody: Buffer.from(JSON.stringify({ error: 'rate_limited' })),
+            responseBody: savePayload ? Buffer.from(JSON.stringify({ error: 'rate_limited' })) : null,
             statusCode: 429,
             durationMs: Date.now() - startedAt,
             redactHeaders: [apiKeyHeader],
@@ -197,7 +200,7 @@ export class ProxyService {
             await this.logs.finalizeLog(baseLog.id, {
               finalUrl: null,
               responseHeaders: { 'content-type': 'application/json' },
-              responseBody: Buffer.from(JSON.stringify({ error: 'rate_limited' })),
+              responseBody: savePayload ? Buffer.from(JSON.stringify({ error: 'rate_limited' })) : null,
               statusCode: 429,
               durationMs: Date.now() - startedAt,
               redactHeaders: [apiKeyHeader],
@@ -215,10 +218,10 @@ export class ProxyService {
 
       const targetTemplate = path.targetUrlTemplate;
       const clientHeaders =
-        (path as any).forwardClientHeaders === false ? {} : normalizeOutgoingHeaders(req.headers, blocked);
+        forwardClientHeaders ? normalizeOutgoingHeaders(req.headers, blocked) : {};
 
       const clientQuery: Record<string, string> = {};
-      if (path.forwardClientQuery !== false) {
+      if (forwardClientQuery) {
         for (const [k, v] of Object.entries(req.query ?? {})) {
           if (v === undefined) continue;
           if (Array.isArray(v)) clientQuery[k] = v.map((x) => String(x)).join(',');
@@ -276,7 +279,7 @@ export class ProxyService {
       await this.logs.finalizeLog(baseLog.id, {
         finalUrl,
         responseHeaders: upstream.headers,
-        responseBody: upstream.body,
+        responseBody: savePayload ? upstream.body : null,
         statusCode: upstream.statusCode,
         durationMs: Date.now() - startedAt,
         redactHeaders: [apiKeyHeader],
@@ -307,7 +310,7 @@ export class ProxyService {
       await this.logs.finalizeLog(baseLog.id, {
         finalUrl: null,
         responseHeaders: { 'content-type': 'application/json' },
-        responseBody: body,
+        responseBody: savePayload ? body : null,
         statusCode: status,
         durationMs: Date.now() - startedAt,
         redactHeaders: [apiKeyHeader],

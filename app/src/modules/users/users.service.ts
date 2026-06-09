@@ -17,6 +17,7 @@ const PERMISSIONS = [
   'paths',
   'apikeys',
   'certificates',
+  'import_export',
   'users',
   'settings',
 ] as const;

@@ -62,6 +62,17 @@ export default function Home() {
           >
             {t('home.health')}
           </a>
+          <a
+            href="https://github.com/felipelm3g/OpenRouteX"
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-white/12 bg-white/5 px-4 text-sm font-medium text-white/80 hover:bg-white/8"
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true" className="h-4 w-4 fill-current">
+              <path d="M12 .5C5.73.5.75 5.7.75 12.1c0 5.12 3.29 9.47 7.86 11 .57.11.78-.25.78-.56v-2.06c-3.2.71-3.87-1.6-3.87-1.6-.52-1.35-1.27-1.71-1.27-1.71-1.04-.72.08-.71.08-.71 1.15.08 1.76 1.2 1.76 1.2 1.02 1.79 2.68 1.27 3.33.97.1-.76.4-1.27.72-1.56-2.56-.3-5.25-1.31-5.25-5.85 0-1.29.45-2.35 1.19-3.17-.12-.3-.52-1.52.11-3.17 0 0 .97-.32 3.18 1.21.92-.26 1.9-.39 2.88-.39.98 0 1.96.13 2.88.39 2.21-1.53 3.18-1.21 3.18-1.21.63 1.65.23 2.87.11 3.17.74.82 1.19 1.88 1.19 3.17 0 4.55-2.7 5.55-5.27 5.85.41.36.78 1.08.78 2.18v3.23c0 .31.21.67.79.56 4.56-1.53 7.85-5.88 7.85-11C23.25 5.7 18.27.5 12 .5Z" />
+            </svg>
+            GitHub
+          </a>
         </div>
 
         <div className="rounded-2xl border border-white/10 bg-white/5 p-6 backdrop-blur">

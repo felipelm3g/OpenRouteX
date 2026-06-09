@@ -51,8 +51,10 @@ const DEFAULTS: SettingsDto = {
   dashboardMetricsRefetchMs: 5000,
   dashboardLogsRefetchMs: 2000,
   dashboardColorizeEnabled: true,
+  logsSavePayloadEnabled: true,
   proxyTimeoutMs: 30000,
   defaultForwardClientQuery: true,
+  defaultForwardClientHeaders: true,
   apiKeyHeaderName: 'API-KEY',
   proxyBlockedHeaders: ['forwarded', 'x-forwarded-for', 'x-forwarded-host', 'x-forwarded-proto', 'x-real-ip'],
   loginMaxAttempts: 3,
@@ -99,8 +101,10 @@ export class SettingsService {
     const dashboardMetricsRefetchMs = parseIntSafe(all.dashboardMetricsRefetchMs, DEFAULTS.dashboardMetricsRefetchMs, 1000, 600000);
     const dashboardLogsRefetchMs = parseIntSafe(all.dashboardLogsRefetchMs, DEFAULTS.dashboardLogsRefetchMs, 1000, 600000);
     const dashboardColorizeEnabled = parseBool(all.dashboardColorizeEnabled, DEFAULTS.dashboardColorizeEnabled);
+    const logsSavePayloadEnabled = parseBool(all.logsSavePayloadEnabled, DEFAULTS.logsSavePayloadEnabled);
     const proxyTimeoutMs = parseIntSafe(all.proxyTimeoutMs, parseIntSafe(process.env.PROXY_TIMEOUT_MS, DEFAULTS.proxyTimeoutMs, 1000, 600000), 1000, 600000);
     const defaultForwardClientQuery = parseBool(all.defaultForwardClientQuery, DEFAULTS.defaultForwardClientQuery);
+    const defaultForwardClientHeaders = parseBool(all.defaultForwardClientHeaders, DEFAULTS.defaultForwardClientHeaders);
     const apiKeyHeaderName = String(all.apiKeyHeaderName ?? DEFAULTS.apiKeyHeaderName).trim() || DEFAULTS.apiKeyHeaderName;
     const proxyBlockedHeaders = parseStringArray(all.proxyBlockedHeaders, DEFAULTS.proxyBlockedHeaders).map((h) => h.toLowerCase());
 
@@ -132,8 +136,10 @@ export class SettingsService {
       dashboardMetricsRefetchMs,
       dashboardLogsRefetchMs,
       dashboardColorizeEnabled,
+      logsSavePayloadEnabled,
       proxyTimeoutMs,
       defaultForwardClientQuery,
+      defaultForwardClientHeaders,
       apiKeyHeaderName,
       proxyBlockedHeaders,
       loginMaxAttempts,
@@ -173,9 +179,13 @@ export class SettingsService {
       updates.push(['dashboardLogsRefetchMs', String(dto.dashboardLogsRefetchMs)]);
     if (dto.dashboardColorizeEnabled !== undefined)
       updates.push(['dashboardColorizeEnabled', String(Boolean(dto.dashboardColorizeEnabled))]);
+    if (dto.logsSavePayloadEnabled !== undefined)
+      updates.push(['logsSavePayloadEnabled', String(Boolean(dto.logsSavePayloadEnabled))]);
     if (dto.proxyTimeoutMs !== undefined) updates.push(['proxyTimeoutMs', String(dto.proxyTimeoutMs)]);
     if (dto.defaultForwardClientQuery !== undefined)
       updates.push(['defaultForwardClientQuery', String(Boolean(dto.defaultForwardClientQuery))]);
+    if (dto.defaultForwardClientHeaders !== undefined)
+      updates.push(['defaultForwardClientHeaders', String(Boolean(dto.defaultForwardClientHeaders))]);
     if (dto.apiKeyHeaderName !== undefined) updates.push(['apiKeyHeaderName', String(dto.apiKeyHeaderName)]);
     if (dto.proxyBlockedHeaders !== undefined)
       updates.push(['proxyBlockedHeaders', JSON.stringify(dto.proxyBlockedHeaders)]);

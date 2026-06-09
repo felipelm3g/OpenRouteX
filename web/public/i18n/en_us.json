@@ -212,6 +212,7 @@
   "nav.paths": "Routes",
   "nav.apiKeys": "Client auth",
   "nav.certificates": "Certificates",
+  "nav.importExport": "Import & Export",
   "nav.users": "Users",
   "nav.settings": "Settings",
   "nav.logout": "Logout",

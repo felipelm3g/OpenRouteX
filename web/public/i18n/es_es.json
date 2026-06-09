@@ -184,6 +184,7 @@
   "nav.paths": "Rutas",
   "nav.apiKeys": "Autenticación del cliente",
   "nav.certificates": "Certificados",
+  "nav.importExport": "Import & Export",
   "nav.users": "Usuarios",
   "nav.settings": "Configuración",
   "nav.logout": "Cerrar sesión",

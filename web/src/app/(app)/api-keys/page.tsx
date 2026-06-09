@@ -6,7 +6,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { DataTable } from '@/components/data-table';
 import { useI18n } from '@/components/i18n-provider';
 import { ConfirmModal, Modal } from '@/components/modal';
-import { ActionMenu, Badge, Button, Card, CardBody, CardHeader, PageShell, Select, TextInput, useToast } from '@/components/ui';
+import { ActionMenu, Badge, Button, Card, CardBody, CardHeader, PageShell, TextInput, useToast } from '@/components/ui';
 import { apiFetch } from '@/lib/api';
 
 type Api = {

@@ -39,6 +39,7 @@ type Path = {
   addQuery: Record<string, string>;
   forwardClientQuery: boolean;
   forwardClientHeaders?: boolean;
+  savePayload?: boolean;
   timeoutSeconds: number | null;
   createdAt: string;
 };
@@ -155,6 +156,7 @@ export default function PathsPage() {
   const [requireClientAuth, setRequireClientAuth] = useState(true);
   const [forwardClientQuery, setForwardClientQuery] = useState(true);
   const [forwardClientHeaders, setForwardClientHeaders] = useState(true);
+  const [savePayload, setSavePayload] = useState(true);
   const [addHeadersText, setAddHeadersText] = useState('{}');
   const [addQueryText, setAddQueryText] = useState('{}');
   const [timeoutSeconds, setTimeoutSeconds] = useState('');
@@ -316,6 +318,7 @@ export default function PathsPage() {
     setRequireClientAuth(true);
     setForwardClientQuery(defaultForward);
     setForwardClientHeaders(true);
+    setSavePayload(true);
     setAddHeadersText('{}');
     setAddQueryText('{}');
     setTimeoutSeconds('');
@@ -345,7 +348,8 @@ export default function PathsPage() {
     setEnabled(Boolean(p.enabled));
     setRequireClientAuth(p.requireClientAuth !== false);
     setForwardClientQuery(p.forwardClientQuery !== false);
-    setForwardClientHeaders((p as any).forwardClientHeaders !== false);
+    setForwardClientHeaders(p.forwardClientHeaders !== false);
+    setSavePayload(p.savePayload !== false);
     setAddHeadersText(JSON.stringify(p.addHeaders ?? {}, null, 2));
     setAddQueryText(JSON.stringify(p.addQuery ?? {}, null, 2));
     setTimeoutSeconds(p.timeoutSeconds ? String(p.timeoutSeconds) : '');
@@ -371,7 +375,8 @@ export default function PathsPage() {
     setEnabled(Boolean(p.enabled));
     setRequireClientAuth(p.requireClientAuth !== false);
     setForwardClientQuery(p.forwardClientQuery !== false);
-    setForwardClientHeaders((p as any).forwardClientHeaders !== false);
+    setForwardClientHeaders(p.forwardClientHeaders !== false);
+    setSavePayload(p.savePayload !== false);
     setAddHeadersText(JSON.stringify(p.addHeaders ?? {}, null, 2));
     setAddQueryText(JSON.stringify(p.addQuery ?? {}, null, 2));
     setTimeoutSeconds(p.timeoutSeconds ? String(p.timeoutSeconds) : '');
@@ -427,6 +432,7 @@ export default function PathsPage() {
         addQuery: parsedAdds.query,
         forwardClientQuery,
         forwardClientHeaders,
+        savePayload,
         timeoutSeconds: timeoutSeconds.trim() ? Number(timeoutSeconds) : null,
       };
       if (editing) {
@@ -1128,6 +1134,22 @@ export default function PathsPage() {
                 </button>
               </div>
             </div>
+
+            <div>
+              <div className="text-xs font-medium text-white/70">Salvar payload</div>
+              <div className="mt-2 flex items-center gap-2">
+                <button
+                  type="button"
+                  className="inline-flex h-10 w-full items-center justify-between gap-2 rounded-xl border border-white/10 bg-white/5 px-3 text-sm text-white/80"
+                  onClick={() => setSavePayload((p: boolean) => !p)}
+                >
+                  <span className="flex items-center gap-2">
+                    <span className={`h-2.5 w-2.5 rounded-full ${savePayload ? 'bg-emerald-400' : 'bg-rose-400'}`} />
+                    {savePayload ? t('common.enabled') : t('common.disabled')}
+                  </span>
+                </button>
+              </div>
+            </div>
           </div>
 
           <div className="sm:col-span-2">
@@ -1139,6 +1161,12 @@ export default function PathsPage() {
           <div className="sm:col-span-2">
             <div className="mt-2 text-xs text-white/50">
               Quando ativo, query params do cliente (ex: ?id=123) são repassados para a URL destino.
+            </div>
+          </div>
+
+          <div className="sm:col-span-2">
+            <div className="mt-2 text-xs text-white/50">
+              Quando desativado, o OpenRouteX não grava o body (request/response) desta rota nos logs.
             </div>
           </div>
 

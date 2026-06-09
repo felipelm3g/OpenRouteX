@@ -250,17 +250,42 @@ export class LoggingService {
     apiKey?: string;
     publicPath?: string;
     statusCode?: number;
+    status?: string;
     from?: Date;
     to?: Date;
     limit?: number;
   }) {
-    const limit = Math.min(200, Math.max(1, params?.limit ?? 50));
+    const limit = Number.isFinite(Number(params?.limit)) && Number(params?.limit) > 0
+      ? Math.floor(Number(params?.limit))
+      : undefined;
 
-    const qb = this.logRepo.createQueryBuilder('l').orderBy('l.createdAt', 'DESC').limit(limit);
+    const qb = this.logRepo
+      .createQueryBuilder('l')
+      .orderBy('l.createdAt', 'DESC')
+      .select([
+        'l.id',
+        'l.requestId',
+        'l.apiKey',
+        'l.apiSlug',
+        'l.publicPath',
+        'l.method',
+        'l.originalUrl',
+        'l.finalUrl',
+        'l.statusCode',
+        'l.durationMs',
+        'l.createdAt',
+        'l.responseAt',
+      ]);
+    if (limit !== undefined) qb.limit(limit);
     if (params?.apiSlug) qb.andWhere('l.apiSlug = :apiSlug', { apiSlug: params.apiSlug });
     if (params?.apiKey) qb.andWhere('l.apiKey = :apiKey', { apiKey: params.apiKey });
     if (params?.publicPath) this.applyPublicPathFilter(qb, params.publicPath);
     if (params?.statusCode) qb.andWhere('l.statusCode = :statusCode', { statusCode: params.statusCode });
+    if (params?.status) {
+      const s = String(params.status).toLowerCase();
+      if (s === 'success') qb.andWhere('l.statusCode >= 200 AND l.statusCode < 300');
+      if (s === 'error') qb.andWhere('(l.statusCode IS NULL OR l.statusCode < 200 OR l.statusCode >= 300)');
+    }
     if (params?.from) qb.andWhere('l.createdAt >= :from', { from: params.from });
     if (params?.to) qb.andWhere('l.createdAt <= :to', { to: params.to });
 
@@ -276,8 +301,11 @@ export class LoggingService {
     to?: Date;
     limit?: number;
   }) {
-    const limit = Math.min(5000, Math.max(1, params?.limit ?? 1000));
-    const qb = this.logRepo.createQueryBuilder('l').orderBy('l.createdAt', 'DESC').limit(limit);
+    const limit = Number.isFinite(Number(params?.limit)) && Number(params?.limit) > 0
+      ? Math.floor(Number(params?.limit))
+      : undefined;
+    const qb = this.logRepo.createQueryBuilder('l').orderBy('l.createdAt', 'DESC');
+    if (limit !== undefined) qb.limit(limit);
     if (params?.apiSlug) qb.andWhere('l.apiSlug = :apiSlug', { apiSlug: params.apiSlug });
     if (params?.apiKey) qb.andWhere('l.apiKey = :apiKey', { apiKey: params.apiKey });
     if (params?.publicPath) this.applyPublicPathFilter(qb, params.publicPath);
@@ -316,7 +344,9 @@ export class LoggingService {
     to?: Date;
     limit?: number;
   }) {
-    const limit = Math.min(500, Math.max(1, params?.limit ?? 100));
+    const limit = Number.isFinite(Number(params?.limit)) && Number(params?.limit) > 0
+      ? Math.floor(Number(params?.limit))
+      : undefined;
 
     const qb = this.logRepo.createQueryBuilder('l');
     if (params?.from) qb.andWhere('l.createdAt >= :from', { from: params.from });
@@ -331,7 +361,7 @@ export class LoggingService {
       if (s === 'error') qb.andWhere('(l.statusCode IS NULL OR l.statusCode < 200 OR l.statusCode >= 300)');
     }
 
-    const rows = await qb
+    const grouped = qb
       .select('l.apiSlug', 'apiSlug')
       .addSelect('l.publicPath', 'publicPath')
       .addSelect('l.method', 'method')
@@ -351,18 +381,18 @@ export class LoggingService {
       .groupBy('l.apiSlug')
       .addGroupBy('l.publicPath')
       .addGroupBy('l.method')
-      .orderBy('total', 'DESC')
-      .limit(limit)
-      .getRawMany<{
-        apiSlug: string;
-        publicPath: string;
-        method: string;
-        total: string;
-        success: string;
-        error: string;
-        avg: string | null;
-        p95: string | null;
-      }>();
+      .orderBy('total', 'DESC');
+    if (limit !== undefined) grouped.limit(limit);
+    const rows = await grouped.getRawMany<{
+      apiSlug: string;
+      publicPath: string;
+      method: string;
+      total: string;
+      success: string;
+      error: string;
+      avg: string | null;
+      p95: string | null;
+    }>();
 
     return rows.map((r: {
       apiSlug: string;
@@ -603,13 +633,18 @@ export class LoggingService {
     from?: Date;
     to?: Date;
   }) {
-    const now = Date.now();
-    const from = params?.from ?? new Date(now - 24 * 60 * 60 * 1000);
-    const to = params?.to ?? new Date(now);
-
     const base = this.logRepo.createQueryBuilder('l');
-    base.where('l.createdAt >= :from', { from });
-    base.andWhere('l.createdAt <= :to', { to });
+    const hasFrom = Boolean(params?.from);
+    const hasTo = Boolean(params?.to);
+    const hasWindow = hasFrom || hasTo;
+
+    if (hasWindow) {
+      const now = Date.now();
+      const from = params?.from ?? new Date(now - 24 * 60 * 60 * 1000);
+      const to = params?.to ?? new Date(now);
+      base.where('l.createdAt >= :from', { from });
+      base.andWhere('l.createdAt <= :to', { to });
+    }
     if (params?.apiSlug) base.andWhere('l.apiSlug = :apiSlug', { apiSlug: params.apiSlug });
     if (params?.publicPath) this.applyPublicPathFilter(base, params.publicPath);
     if (params?.statusCode) base.andWhere('l.statusCode = :statusCode', { statusCode: params.statusCode });
@@ -643,8 +678,28 @@ export class LoggingService {
       .limit(8)
       .getRawMany<{ apiSlug: string; requests: string }>();
 
+    const windowHours = await (async () => {
+      if (hasWindow) {
+        const now = Date.now();
+        const from = params?.from ?? new Date(now - 24 * 60 * 60 * 1000);
+        const to = params?.to ?? new Date(now);
+        return Math.max(0, Math.round(((to.getTime() - from.getTime()) / (60 * 60 * 1000)) * 10) / 10);
+      }
+      const row = await base
+        .clone()
+        .select('MIN(l.createdAt)', 'min')
+        .addSelect('MAX(l.createdAt)', 'max')
+        .getRawOne<{ min: string | null; max: string | null }>();
+      const min = row?.min ? new Date(row.min) : null;
+      const max = row?.max ? new Date(row.max) : null;
+      if (!min || !max) return 0;
+      const diff = max.getTime() - min.getTime();
+      if (!Number.isFinite(diff) || diff <= 0) return 0;
+      return Math.max(0, Math.round(((diff / (60 * 60 * 1000)) * 10)) / 10);
+    })();
+
     return {
-      windowHours: Math.max(0, Math.round(((to.getTime() - from.getTime()) / (60 * 60 * 1000)) * 10) / 10),
+      windowHours,
       totalRequests: total,
       errorRequests: errors,
       avgLatencyMs: latencyRow?.avg ? Math.round(Number(latencyRow.avg)) : null,

@@ -203,6 +203,37 @@ export class CertificatesService {
     return { ok: true };
   }
 
+  async exportPlain(id: string): Promise<{
+    name: string;
+    format: 'pem' | 'pfx';
+    pemCert?: string;
+    pemKey?: string;
+    pemPassphrase?: string;
+    caPem?: string;
+    pfxBase64?: string;
+    pfxPassphrase?: string;
+  }> {
+    const row = await this.get(id);
+    if (row.format === 'pem') {
+      const payload = this.decryptJson<PemPayload>(row.encrypted);
+      return {
+        name: row.name,
+        format: 'pem',
+        pemCert: payload.certPem,
+        pemKey: payload.keyPem,
+        pemPassphrase: payload.passphrase,
+        caPem: payload.caPem,
+      };
+    }
+    const payload = this.decryptJson<PfxPayload>(row.encrypted);
+    return {
+      name: row.name,
+      format: 'pfx',
+      pfxBase64: payload.pfxBase64,
+      pfxPassphrase: payload.passphrase,
+    };
+  }
+
   async getTlsForApiCertificateId(certificateId: string | null | undefined): Promise<null | { cert?: string; key?: string; pfx?: Buffer; passphrase?: string; ca?: string }> {
     if (!certificateId) return null;
     const row = await this.get(certificateId);

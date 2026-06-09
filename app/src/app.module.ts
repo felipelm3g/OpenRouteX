@@ -6,6 +6,7 @@ import { ApiKeysModule } from './modules/apikeys/apikeys.module';
 import { ApisModule } from './modules/apis/apis.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { CertificatesModule } from './modules/certificates/certificates.module';
+import { ImportExportModule } from './modules/import-export/import-export.module';
 import { LoggingModule } from './modules/logging/logging.module';
 import { PathsModule } from './modules/paths/paths.module';
 import { ProxyModule } from './modules/proxy/proxy.module';
@@ -43,6 +44,7 @@ import { VariablesModule } from './modules/variables/variables.module';
     ApisModule,
     PathsModule,
     ApiKeysModule,
+    ImportExportModule,
     ProxyModule,
   ],
 })

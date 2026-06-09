@@ -55,11 +55,15 @@ export class LoggingController {
     const api = this.normalizeApiSlug(apiSlug);
     const fromDate = from ? new Date(from) : undefined;
     const toDate = to ? new Date(to) : undefined;
+    const statusRaw = String(status ?? '').trim();
+    const statusNum = statusRaw && /^\d+$/.test(statusRaw) ? Number(statusRaw) : null;
+    const statusClass = statusNum === null && statusRaw ? statusRaw.toLowerCase() : undefined;
     return this.logs.list({
       apiSlug: api,
       apiKey,
       publicPath,
-      statusCode: status ? Number(status) : undefined,
+      statusCode: statusNum === null ? undefined : statusNum,
+      status: statusClass,
       from: fromDate && !Number.isNaN(fromDate.getTime()) ? fromDate : undefined,
       to: toDate && !Number.isNaN(toDate.getTime()) ? toDate : undefined,
       limit: limit ? Number(limit) : undefined,

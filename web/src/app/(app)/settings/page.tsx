@@ -19,8 +19,10 @@ type SettingsDto = {
   dashboardMetricsRefetchMs: number;
   dashboardLogsRefetchMs: number;
   dashboardColorizeEnabled: boolean;
+  logsSavePayloadEnabled: boolean;
   proxyTimeoutMs: number;
   defaultForwardClientQuery: boolean;
+  defaultForwardClientHeaders: boolean;
   apiKeyHeaderName: string;
   proxyBlockedHeaders: string[];
   loginMaxAttempts: number;
@@ -103,18 +105,17 @@ export default function SettingsPage() {
   const [dashboardMetricsRefetchMs, setDashboardMetricsRefetchMs] = useState('5000');
   const [dashboardLogsRefetchMs, setDashboardLogsRefetchMs] = useState('2000');
   const [dashboardColorizeEnabled, setDashboardColorizeEnabled] = useState('true');
+  const [logsSavePayloadEnabled, setLogsSavePayloadEnabled] = useState('true');
   const [proxyTimeoutMs, setProxyTimeoutMs] = useState('30000');
   const [defaultForwardClientQuery, setDefaultForwardClientQuery] = useState('true');
+  const [defaultForwardClientHeaders, setDefaultForwardClientHeaders] = useState('true');
   const [apiKeyHeaderName, setApiKeyHeaderName] = useState('API-KEY');
   const [proxyBlockedHeadersText, setProxyBlockedHeadersText] = useState('');
   const [loginMaxAttempts, setLoginMaxAttempts] = useState('3');
   const [loginLockMinutes, setLoginLockMinutes] = useState('180');
   const [loginLockEmailEnabled, setLoginLockEmailEnabled] = useState('true');
   const [passwordMinLength, setPasswordMinLength] = useState('8');
-  const [passwordRequireUppercase, setPasswordRequireUppercase] = useState('false');
-  const [passwordRequireLowercase, setPasswordRequireLowercase] = useState('false');
-  const [passwordRequireNumber, setPasswordRequireNumber] = useState('false');
-  const [passwordRequireSymbol, setPasswordRequireSymbol] = useState('false');
+  const [passwordRequirePreset, setPasswordRequirePreset] = useState('0');
   const [passwordMaxAgeDays, setPasswordMaxAgeDays] = useState('0');
   const [smtpHost, setSmtpHost] = useState('');
   const [smtpPort, setSmtpPort] = useState('587');
@@ -143,18 +144,22 @@ export default function SettingsPage() {
       setDashboardMetricsRefetchMs(String(data.dashboardMetricsRefetchMs ?? 5000));
       setDashboardLogsRefetchMs(String(data.dashboardLogsRefetchMs ?? 2000));
       setDashboardColorizeEnabled(String(Boolean(data.dashboardColorizeEnabled ?? true)));
+      setLogsSavePayloadEnabled(String(Boolean(data.logsSavePayloadEnabled ?? true)));
       setProxyTimeoutMs(String(data.proxyTimeoutMs ?? 30000));
       setDefaultForwardClientQuery(String(Boolean(data.defaultForwardClientQuery ?? true)));
+      setDefaultForwardClientHeaders(String(Boolean(data.defaultForwardClientHeaders ?? true)));
       setApiKeyHeaderName(String(data.apiKeyHeaderName ?? 'API-KEY'));
       setProxyBlockedHeadersText((data.proxyBlockedHeaders ?? []).join('\n'));
       setLoginMaxAttempts(String(data.loginMaxAttempts ?? 3));
       setLoginLockMinutes(String(data.loginLockMinutes ?? 180));
       setLoginLockEmailEnabled(String(Boolean(data.loginLockEmailEnabled ?? true)));
       setPasswordMinLength(String(data.passwordMinLength ?? 8));
-      setPasswordRequireUppercase(String(Boolean(data.passwordRequireUppercase ?? false)));
-      setPasswordRequireLowercase(String(Boolean(data.passwordRequireLowercase ?? false)));
-      setPasswordRequireNumber(String(Boolean(data.passwordRequireNumber ?? false)));
-      setPasswordRequireSymbol(String(Boolean(data.passwordRequireSymbol ?? false)));
+      const preset =
+        (data.passwordRequireUppercase ? 1 : 0) +
+        (data.passwordRequireLowercase ? 2 : 0) +
+        (data.passwordRequireNumber ? 4 : 0) +
+        (data.passwordRequireSymbol ? 8 : 0);
+      setPasswordRequirePreset(String(preset));
       setPasswordMaxAgeDays(String(data.passwordMaxAgeDays ?? 0));
       setSmtpHost(data.smtpHost ?? '');
       setSmtpPort(String(data.smtpPort ?? 587));
@@ -179,8 +184,10 @@ export default function SettingsPage() {
         dashboardMetricsRefetchMs: number;
         dashboardLogsRefetchMs: number;
         dashboardColorizeEnabled: boolean;
+        logsSavePayloadEnabled: boolean;
         proxyTimeoutMs: number;
         defaultForwardClientQuery: boolean;
+        defaultForwardClientHeaders: boolean;
         apiKeyHeaderName: string;
         proxyBlockedHeaders: string[];
         loginMaxAttempts: number;
@@ -200,6 +207,21 @@ export default function SettingsPage() {
         smtpTlsRejectUnauthorized: boolean;
         smtpPassword?: string;
       } = {
+        ...((): {
+          passwordRequireUppercase: boolean;
+          passwordRequireLowercase: boolean;
+          passwordRequireNumber: boolean;
+          passwordRequireSymbol: boolean;
+        } => {
+          const mask = Number(passwordRequirePreset);
+          const v = Number.isFinite(mask) ? mask : 0;
+          return {
+            passwordRequireUppercase: (v & 1) !== 0,
+            passwordRequireLowercase: (v & 2) !== 0,
+            passwordRequireNumber: (v & 4) !== 0,
+            passwordRequireSymbol: (v & 8) !== 0,
+          };
+        })(),
         language: language.trim() || currentLanguage,
         timezone: timezone.trim() || 'UTC',
         logsRetentionDays: Number(logsRetentionDays),
@@ -209,8 +231,10 @@ export default function SettingsPage() {
         dashboardMetricsRefetchMs: Number(dashboardMetricsRefetchMs),
         dashboardLogsRefetchMs: Number(dashboardLogsRefetchMs),
         dashboardColorizeEnabled: dashboardColorizeEnabled === 'true',
+        logsSavePayloadEnabled: logsSavePayloadEnabled === 'true',
         proxyTimeoutMs: Number(proxyTimeoutMs),
         defaultForwardClientQuery: defaultForwardClientQuery === 'true',
+        defaultForwardClientHeaders: defaultForwardClientHeaders === 'true',
         apiKeyHeaderName: apiKeyHeaderName.trim() || 'API-KEY',
         proxyBlockedHeaders: proxyBlockedHeadersText
           .split('\n')
@@ -220,10 +244,6 @@ export default function SettingsPage() {
         loginLockMinutes: Number(loginLockMinutes),
         loginLockEmailEnabled: loginLockEmailEnabled === 'true',
         passwordMinLength: Number(passwordMinLength),
-        passwordRequireUppercase: passwordRequireUppercase === 'true',
-        passwordRequireLowercase: passwordRequireLowercase === 'true',
-        passwordRequireNumber: passwordRequireNumber === 'true',
-        passwordRequireSymbol: passwordRequireSymbol === 'true',
         passwordMaxAgeDays: Number(passwordMaxAgeDays),
         smtpHost: smtpHost.trim(),
         smtpPort: Number(smtpPort),
@@ -420,20 +440,133 @@ export default function SettingsPage() {
             <div>
               <div className="text-xs font-medium text-white/70">{t('settings.dashboard.colorize')}</div>
               <div className="mt-2">
-                <div className="flex flex-wrap items-center gap-2">
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={() => setDashboardColorizeEnabled((v) => (v === 'true' ? 'false' : 'true'))}
-                  >
-                    {dashboardColorizeEnabled === 'true' ? t('common.enabled') : t('common.disabled')}
-                  </Button>
-                  <Button variant="danger" size="sm" onClick={() => setPurgeOpen(true)}>
-                    Limpar logs
-                  </Button>
-                </div>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => setDashboardColorizeEnabled((v) => (v === 'true' ? 'false' : 'true'))}
+                >
+                  {dashboardColorizeEnabled === 'true' ? t('common.enabled') : t('common.disabled')}
+                </Button>
               </div>
               <div className="mt-2 text-xs text-white/55">{t('settings.dashboard.colorize.help')}</div>
+            </div>
+
+            <div>
+              <div className="text-xs font-medium text-white/70">Salvar payload nos logs</div>
+              <div className="mt-2">
+                <button
+                  type="button"
+                  className="inline-flex h-10 w-full items-center justify-between gap-2 rounded-xl border border-white/10 bg-white/5 px-3 text-sm text-white/80"
+                  onClick={() => setLogsSavePayloadEnabled((v) => (v === 'true' ? 'false' : 'true'))}
+                >
+                  <span className="flex items-center gap-2">
+                    <span
+                      className={`h-2.5 w-2.5 rounded-full ${
+                        logsSavePayloadEnabled === 'true' ? 'bg-emerald-400' : 'bg-rose-400'
+                      }`}
+                    />
+                    {logsSavePayloadEnabled === 'true' ? t('common.enabled') : t('common.disabled')}
+                  </span>
+                </button>
+              </div>
+              <div className="mt-2 text-xs text-white/55">
+                Quando desativado, o OpenRouteX não grava o body (request/response) nos logs por padrão. Você ainda pode
+                controlar isso por rota.
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-6 rounded-2xl border border-rose-500/25 bg-rose-500/5 p-4">
+            <div className="text-xs font-semibold text-rose-200">Logs do sistema</div>
+            <div className="mt-1 text-xs text-white/65">
+              Remove todos os logs salvos no banco e zera os dados exibidos no Dashboard.
+            </div>
+            <div className="mt-3">
+              <Button variant="danger" size="sm" onClick={() => setPurgeOpen(true)}>
+                Limpar logs do sistema
+              </Button>
+            </div>
+          </div>
+
+          <div className="mt-8 border-t border-white/10 pt-6">
+            <div className="text-sm font-medium text-zinc-50">{t('settings.security.title')}</div>
+            <div className="mt-1 text-sm text-[color:var(--muted-2)]">{t('settings.security.description')}</div>
+
+            <div className="mt-4 grid gap-4 sm:grid-cols-3">
+              <div>
+                <div className="text-xs font-medium text-white/70">{t('settings.security.passwordMinLength')}</div>
+                <div className="mt-2">
+                  <TextInput value={passwordMinLength} onChange={setPasswordMinLength} type="number" placeholder="8" />
+                </div>
+              </div>
+              <div>
+                <div className="text-xs font-medium text-white/70">Exigir</div>
+                <div className="mt-2">
+                  <Select
+                    value={passwordRequirePreset}
+                    onChange={setPasswordRequirePreset}
+                    options={[
+                      { value: '0', label: 'Nada' },
+                      { value: '1', label: 'Maiúscula' },
+                      { value: '2', label: 'Minúscula' },
+                      { value: '4', label: 'Número' },
+                      { value: '8', label: 'Símbolo' },
+                      { value: '3', label: 'Maiúscula + Minúscula' },
+                      { value: '5', label: 'Maiúscula + Número' },
+                      { value: '9', label: 'Maiúscula + Símbolo' },
+                      { value: '6', label: 'Minúscula + Número' },
+                      { value: '10', label: 'Minúscula + Símbolo' },
+                      { value: '12', label: 'Número + Símbolo' },
+                      { value: '7', label: 'Maiúscula + Minúscula + Número' },
+                      { value: '11', label: 'Maiúscula + Minúscula + Símbolo' },
+                      { value: '13', label: 'Maiúscula + Número + Símbolo' },
+                      { value: '14', label: 'Minúscula + Número + Símbolo' },
+                      { value: '15', label: 'Maiúscula + Minúscula + Número + Símbolo' },
+                    ]}
+                  />
+                </div>
+                <div className="mt-2 text-xs text-white/55">
+                  Define os requisitos mínimos de caracteres na senha.
+                </div>
+              </div>
+              <div>
+                <div className="text-xs font-medium text-white/70">{t('settings.security.passwordMaxAgeDays')}</div>
+                <div className="mt-2">
+                  <TextInput value={passwordMaxAgeDays} onChange={setPasswordMaxAgeDays} type="number" placeholder="0" />
+                </div>
+                <div className="mt-2 text-xs text-white/55">{t('settings.security.passwordMaxAgeDays.help')}</div>
+              </div>
+            </div>
+
+            <div className="mt-6 grid gap-4 sm:grid-cols-3">
+              <div>
+                <div className="text-xs font-medium text-white/70">{t('settings.security.loginMaxAttempts')}</div>
+                <div className="mt-2">
+                  <TextInput value={loginMaxAttempts} onChange={setLoginMaxAttempts} type="number" placeholder="3" />
+                </div>
+              </div>
+              <div>
+                <div className="text-xs font-medium text-white/70">{t('settings.security.loginLockMinutes')}</div>
+                <div className="mt-2">
+                  <TextInput value={loginLockMinutes} onChange={setLoginLockMinutes} type="number" placeholder="180" />
+                </div>
+              </div>
+              <div>
+                <div className="text-xs font-medium text-white/70">{t('settings.security.loginLockEmailEnabled')}</div>
+                <div className="mt-2">
+                  <button
+                    type="button"
+                    className="inline-flex h-10 w-full items-center justify-between gap-2 rounded-xl border border-white/10 bg-white/5 px-3 text-sm text-white/80"
+                    onClick={() => setLoginLockEmailEnabled((v) => (v === 'true' ? 'false' : 'true'))}
+                  >
+                    <span className="flex items-center gap-2">
+                      <span className={`h-2.5 w-2.5 rounded-full ${loginLockEmailEnabled === 'true' ? 'bg-emerald-400' : 'bg-rose-400'}`} />
+                      {loginLockEmailEnabled === 'true' ? t('common.enabled') : t('common.disabled')}
+                    </span>
+                  </button>
+                </div>
+                <div className="mt-2 text-xs text-white/55">{t('settings.security.loginLockEmailEnabled.help')}</div>
+              </div>
             </div>
           </div>
         </CardBody>
@@ -450,7 +583,7 @@ export default function SettingsPage() {
           }
         />
         <CardBody>
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid gap-4 sm:grid-cols-3">
             <div>
               <div className="text-xs font-medium text-white/70">{t('settings.gateway.proxyTimeoutMs')}</div>
               <div className="mt-2">
@@ -459,18 +592,40 @@ export default function SettingsPage() {
               <div className="mt-2 text-xs text-white/55">{t('settings.gateway.proxyTimeoutMs.help')}</div>
             </div>
             <div>
-              <div className="text-xs font-medium text-white/70">{t('settings.gateway.defaultForwardQuery')}</div>
+              <div className="text-xs font-medium text-white/70">Repassar query params</div>
               <div className="mt-2">
-                <Select
-                  value={defaultForwardClientQuery}
-                  onChange={setDefaultForwardClientQuery}
-                  options={[
-                    { value: 'true', label: t('common.yes') },
-                    { value: 'false', label: t('common.no') },
-                  ]}
-                />
+                <button
+                  type="button"
+                  className="inline-flex h-10 w-full items-center justify-between gap-2 rounded-xl border border-white/10 bg-white/5 px-3 text-sm text-white/80"
+                  onClick={() => setDefaultForwardClientQuery((v) => (v === 'true' ? 'false' : 'true'))}
+                >
+                  <span className="flex items-center gap-2">
+                    <span className={`h-2.5 w-2.5 rounded-full ${defaultForwardClientQuery === 'true' ? 'bg-emerald-400' : 'bg-rose-400'}`} />
+                    {defaultForwardClientQuery === 'true' ? t('common.enabled') : t('common.disabled')}
+                  </span>
+                </button>
               </div>
-              <div className="mt-2 text-xs text-white/55">{t('settings.gateway.defaultForwardQuery.help')}</div>
+              <div className="mt-2 text-xs text-white/55">
+                Quando desativado, nenhum query param do cliente é repassado por padrão (a rota também pode controlar isso).
+              </div>
+            </div>
+            <div>
+              <div className="text-xs font-medium text-white/70">Repassar headers</div>
+              <div className="mt-2">
+                <button
+                  type="button"
+                  className="inline-flex h-10 w-full items-center justify-between gap-2 rounded-xl border border-white/10 bg-white/5 px-3 text-sm text-white/80"
+                  onClick={() => setDefaultForwardClientHeaders((v) => (v === 'true' ? 'false' : 'true'))}
+                >
+                  <span className="flex items-center gap-2">
+                    <span className={`h-2.5 w-2.5 rounded-full ${defaultForwardClientHeaders === 'true' ? 'bg-emerald-400' : 'bg-rose-400'}`} />
+                    {defaultForwardClientHeaders === 'true' ? t('common.enabled') : t('common.disabled')}
+                  </span>
+                </button>
+              </div>
+              <div className="mt-2 text-xs text-white/55">
+                Quando desativado, nenhum header do cliente é repassado por padrão (a rota também pode controlar isso).
+              </div>
             </div>
             <div>
               <div className="text-xs font-medium text-white/70">{t('settings.gateway.apiKeyHeaderName')}</div>
@@ -479,7 +634,7 @@ export default function SettingsPage() {
               </div>
               <div className="mt-2 text-xs text-white/55">{t('settings.gateway.apiKeyHeaderName.help')}</div>
             </div>
-            <div className="sm:col-span-2">
+            <div className="sm:col-span-3">
               <div className="text-xs font-medium text-white/70">{t('settings.gateway.blockedHeaders')}</div>
               <div className="mt-2 text-xs text-white/55">{t('settings.gateway.blockedHeaders.help')}</div>
               <textarea
@@ -488,85 +643,6 @@ export default function SettingsPage() {
                 className="mt-3 h-36 w-full rounded-xl border border-white/10 bg-white/5 p-3 font-mono text-sm text-white/85 outline-none focus:ring-2 focus:ring-[color:var(--accent)]/30"
                 placeholder="authorization&#10;cookie"
               />
-            </div>
-          </div>
-        </CardBody>
-      </Card>
-
-      <Card>
-        <CardHeader
-          title={t('settings.security.title')}
-          description={t('settings.security.description')}
-          right={
-            <Button onClick={() => save.mutate()} disabled={save.isPending || q.isPending}>
-              {t('common.save')}
-            </Button>
-          }
-        />
-        <CardBody>
-          <div className="grid gap-4 sm:grid-cols-3">
-            <div>
-              <div className="text-xs font-medium text-white/70">{t('settings.security.passwordMinLength')}</div>
-              <div className="mt-2">
-                <TextInput value={passwordMinLength} onChange={setPasswordMinLength} type="number" placeholder="8" />
-              </div>
-            </div>
-            <div>
-              <div className="text-xs font-medium text-white/70">{t('settings.security.passwordMaxAgeDays')}</div>
-              <div className="mt-2">
-                <TextInput value={passwordMaxAgeDays} onChange={setPasswordMaxAgeDays} type="number" placeholder="0" />
-              </div>
-              <div className="mt-2 text-xs text-white/55">{t('settings.security.passwordMaxAgeDays.help')}</div>
-            </div>
-            <div />
-          </div>
-
-          <div className="mt-5 grid gap-4 sm:grid-cols-4">
-            <div>
-              <div className="text-xs font-medium text-white/70">{t('settings.security.requireUpper')}</div>
-              <div className="mt-2">
-                <Select value={passwordRequireUppercase} onChange={setPasswordRequireUppercase} options={[{ value: 'false', label: t('common.no') }, { value: 'true', label: t('common.yes') }]} />
-              </div>
-            </div>
-            <div>
-              <div className="text-xs font-medium text-white/70">{t('settings.security.requireLower')}</div>
-              <div className="mt-2">
-                <Select value={passwordRequireLowercase} onChange={setPasswordRequireLowercase} options={[{ value: 'false', label: t('common.no') }, { value: 'true', label: t('common.yes') }]} />
-              </div>
-            </div>
-            <div>
-              <div className="text-xs font-medium text-white/70">{t('settings.security.requireNumber')}</div>
-              <div className="mt-2">
-                <Select value={passwordRequireNumber} onChange={setPasswordRequireNumber} options={[{ value: 'false', label: t('common.no') }, { value: 'true', label: t('common.yes') }]} />
-              </div>
-            </div>
-            <div>
-              <div className="text-xs font-medium text-white/70">{t('settings.security.requireSymbol')}</div>
-              <div className="mt-2">
-                <Select value={passwordRequireSymbol} onChange={setPasswordRequireSymbol} options={[{ value: 'false', label: t('common.no') }, { value: 'true', label: t('common.yes') }]} />
-              </div>
-            </div>
-          </div>
-
-          <div className="mt-6 grid gap-4 sm:grid-cols-3">
-            <div>
-              <div className="text-xs font-medium text-white/70">{t('settings.security.loginMaxAttempts')}</div>
-              <div className="mt-2">
-                <TextInput value={loginMaxAttempts} onChange={setLoginMaxAttempts} type="number" placeholder="3" />
-              </div>
-            </div>
-            <div>
-              <div className="text-xs font-medium text-white/70">{t('settings.security.loginLockMinutes')}</div>
-              <div className="mt-2">
-                <TextInput value={loginLockMinutes} onChange={setLoginLockMinutes} type="number" placeholder="180" />
-              </div>
-            </div>
-            <div>
-              <div className="text-xs font-medium text-white/70">{t('settings.security.loginLockEmailEnabled')}</div>
-              <div className="mt-2">
-                <Select value={loginLockEmailEnabled} onChange={setLoginLockEmailEnabled} options={[{ value: 'true', label: t('common.yes') }, { value: 'false', label: t('common.no') }]} />
-              </div>
-              <div className="mt-2 text-xs text-white/55">{t('settings.security.loginLockEmailEnabled.help')}</div>
             </div>
           </div>
         </CardBody>
@@ -674,9 +750,9 @@ export default function SettingsPage() {
           setPurgeOpen(false);
           setPurgeConfirm('');
         }}
-        title="Limpar logs do dashboard"
+        title="Limpar logs do sistema"
         description='Esta ação remove TODOS os logs armazenados no banco e zera os dados exibidos no Dashboard. Para confirmar, digite "DELETE" (maiúsculo).'
-        confirmText="Limpar"
+        confirmText="Limpar logs"
         onConfirm={() => {
           if (purgeConfirm !== 'DELETE') {
             toast.error('Confirmação inválida', 'Digite DELETE (maiúsculo) para continuar.');
